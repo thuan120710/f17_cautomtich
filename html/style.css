@@ -1,0 +1,665 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: transparent;
+    overflow: hidden;
+}
+
+.hidden {
+    display: none !important;
+}
+
+/* ============================================
+   MINIGAME TÔM TÍCH - THIẾT KẾ DỌC (VERTICAL)
+   ============================================ */
+
+#tomtich-container {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 9999;
+    background: transparent;
+}
+
+.tomtich-wrapper {
+    background: url('images/catbien2.png');
+    border-radius: 20px;
+    padding: 25px;
+    max-width: 650px;
+    width: 85%;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+    border: 3px solid rgba(139, 115, 85, 0.6);
+    position: relative;
+    user-select: none;
+}
+
+.tomtich-close-btn {
+    position: absolute;
+    top: 15px;
+    right: 15px;
+    background: rgba(139, 115, 85, 0.4);
+    border: 2px solid rgba(139, 115, 85, 0.7);
+    color: #5a4a3a;
+    font-size: 20px;
+    width: 35px;
+    height: 35px;
+    border-radius: 50%;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    font-weight: bold;
+    z-index: 10;
+}
+
+.tomtich-close-btn:hover {
+    background: rgba(255, 100, 100, 0.8);
+    color: white;
+    transform: rotate(90deg);
+}
+
+/* Scene dọc - Cát hai bên và hang giữa */
+.tomtich-scene-vertical {
+    display: flex;
+    flex-direction: row;
+    align-items: stretch;
+    height: 650px;
+    margin-bottom: 25px;
+    position: relative;
+    border-radius: 15px;
+    overflow: hidden;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+    user-select: none;
+}
+
+/* Cát bên trái */
+.sand-left-vertical {
+    width: 28%;
+    background: url('images/catbien1.png');
+    position: relative;
+    border-radius: 15px 0 0 15px;
+}
+
+.sand-decorations {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-around;
+    align-items: center;
+    padding: 40px 0;
+}
+
+.sand-decorations .deco {
+    font-size: 32px;
+    opacity: 0.6;
+    animation: float 3s ease-in-out infinite;
+}
+
+.sand-decorations .deco:nth-child(2) {
+    animation-delay: 1.5s;
+}
+
+@keyframes float {
+
+    0%,
+    100% {
+        transform: translateY(0);
+    }
+
+    50% {
+        transform: translateY(-10px);
+    }
+}
+
+/* Container thanh timing bên ngoài cát phải */
+.timing-container-outside {
+    width: 12%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    border-radius: 0 15px 15px 0;
+}
+
+/* Cát bên phải */
+.sand-right-vertical {
+    width: 25%;
+    background: url('images/catbien1.png');
+    position: relative;
+    border-radius: 0 15px 15px 0;
+}
+
+/* Hang tôm tích dọc (hẹp và dài) ở giữa */
+.cave-vertical {
+    width: 32%;
+    height: 100%;
+    background: linear-gradient(180deg,
+            rgba(80, 70, 60, 0.4) 0%,
+            rgba(60, 50, 40, 0.6) 30%,
+            rgba(40, 30, 20, 0.8) 100%);
+    border-left: 4px solid #8b7355;
+    border-right: 4px solid #8b7355;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    box-shadow: inset 0 5px 30px rgba(0, 0, 0, 0.7);
+    user-select: none;
+}
+
+/* ============================================
+   TENSION BAR SYSTEM - CƠ CHẾ LỰC CĂNG MỚI
+   ============================================ */
+
+/* Thanh lực căng (Tension Bar) */
+.tension-bar-container {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 10px 0;
+}
+
+.tension-label {
+    font-size: 12px;
+    font-weight: bold;
+    color: #5a4a3a;
+    margin-bottom: 10px;
+    text-shadow: 1px 1px 2px rgba(255, 255, 255, 0.5);
+}
+
+.tension-bar {
+    position: relative;
+    width: 60px;
+    height: 85%;
+    border-radius: 30px;
+    border: 3px solid rgba(139, 115, 85, 0.7);
+    box-shadow: 0 5px 20px rgba(0, 0, 0, 0.4);
+    overflow: hidden;
+}
+
+/* Các vùng lực căng */
+.tension-zone {
+    position: absolute;
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.tension-zone.danger-low-top {
+    top: 0;
+    height: 30%;
+    background: linear-gradient(180deg,
+            rgba(255, 150, 50, 0.7) 0%,
+            rgba(255, 100, 50, 0.5) 100%);
+}
+
+.tension-zone.safe-zone {
+    top: 30%;
+    height: 40%;
+    background: linear-gradient(180deg,
+            rgba(100, 255, 100, 0.6) 0%,
+            rgba(150, 255, 150, 0.5) 50%,
+            rgba(255, 255, 100, 0.5) 100%);
+}
+
+.tension-zone.danger-high-bottom {
+    top: 70%;
+    height: 30%;
+    background: linear-gradient(180deg,
+            rgba(255, 100, 100, 0.5) 0%,
+            rgba(255, 50, 50, 0.7) 100%);
+}
+
+.zone-label {
+    font-size: 9px;
+    font-weight: bold;
+    color: white;
+    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);
+    writing-mode: vertical-rl;
+    text-orientation: mixed;
+}
+
+/* Thanh chỉ báo lực hiện tại */
+.tension-indicator {
+    position: absolute;
+    left: -12px;
+    width: calc(100% + 24px);
+    height: 12px;
+    background: linear-gradient(90deg,
+            transparent 0%,
+            #ff3333 8%,
+            #ff5555 50%,
+            #ff3333 92%,
+            transparent 100%);
+    border-radius: 6px;
+    box-shadow: 0 0 20px rgba(255, 68, 68, 1);
+    transition: top 0.1s linear;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    z-index: 10;
+}
+
+.indicator-arrow {
+    color: #ff3333;
+    font-size: 18px;
+    text-shadow: 0 0 10px rgba(255, 68, 68, 1);
+    animation: arrowPulse 0.8s ease-in-out infinite;
+}
+
+.indicator-value {
+    font-size: 10px;
+    font-weight: bold;
+    color: white;
+    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);
+}
+
+/* Hang rung khi tôm giật */
+.cave-vertical.shake {
+    animation: caveShake 0.3s ease-in-out;
+}
+
+@keyframes caveShake {
+
+    0%,
+    100% {
+        transform: translateX(0);
+    }
+
+    25% {
+        transform: translateX(-5px);
+    }
+
+    75% {
+        transform: translateX(5px);
+    }
+}
+
+/* Tôm giật */
+.shrimp-icon.pulling {
+    animation: shrimpPull 0.4s ease-in-out;
+    filter: drop-shadow(0 0 20px rgba(255, 50, 50, 1)) !important;
+}
+
+@keyframes shrimpPull {
+
+    0%,
+    100% {
+        transform: translateY(0) rotate(-3deg) scale(1);
+    }
+
+    50% {
+        transform: translateY(-15px) rotate(10deg) scale(1.2);
+    }
+}
+
+/* Cảnh báo tôm giật */
+.pull-warning {
+    position: absolute;
+    top: 20%;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(255, 50, 50, 0.9);
+    color: white;
+    padding: 8px 15px;
+    border-radius: 10px;
+    font-weight: bold;
+    font-size: 14px;
+    animation: warningPulse 0.8s ease-in-out;
+    z-index: 20;
+    box-shadow: 0 0 20px rgba(255, 50, 50, 0.8);
+}
+
+@keyframes warningPulse {
+
+    0%,
+    100% {
+        opacity: 0;
+        transform: translateX(-50%) scale(0.8);
+    }
+
+    50% {
+        opacity: 1;
+        transform: translateX(-50%) scale(1.1);
+    }
+}
+
+@keyframes arrowPulse {
+
+    0%,
+    100% {
+        opacity: 1;
+    }
+
+    50% {
+        opacity: 0.5;
+    }
+}
+
+/* Dây câu dọc */
+.fishing-line-vertical {
+    position: absolute;
+    top: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 5px;
+    background: linear-gradient(180deg,
+            rgba(120, 120, 120, 0.9) 0%,
+            rgba(100, 100, 100, 0.95) 100%);
+    transition: height 0.05s linear;
+    z-index: 5;
+}
+
+.hook-vertical {
+    position: absolute;
+    bottom: -20px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 24px;
+    filter: drop-shadow(0 2px 5px rgba(0, 0, 0, 0.5));
+    animation: hookSwing 1s ease-in-out infinite;
+}
+
+@keyframes hookSwing {
+
+    0%,
+    100% {
+        transform: translateX(-50%) rotate(-5deg);
+    }
+
+    50% {
+        transform: translateX(-50%) rotate(5deg);
+    }
+}
+
+/* Đáy hang với tôm tích */
+.cave-bottom {
+    position: absolute;
+    bottom: 0;
+    width: 100%;
+    height: 120px;
+    background: radial-gradient(ellipse at center,
+            rgba(20, 20, 20, 0.95) 0%,
+            rgba(40, 30, 20, 0.85) 100%);
+    border-radius: 50% 50% 0 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: inset 0 15px 30px rgba(0, 0, 0, 0.9);
+}
+
+/* Container tôm - di chuyển theo lực căng */
+.shrimp-container {
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    transition: top 0.2s ease-out;
+    z-index: 6;
+}
+
+.shrimp-icon {
+    font-size: 56px;
+    animation: shrimpWiggle 1.5s ease-in-out infinite;
+    filter: drop-shadow(0 0 15px rgba(255, 100, 50, 0.8));
+}
+
+@keyframes shrimpWiggle {
+
+    0%,
+    100% {
+        transform: translateY(0) rotate(-3deg);
+    }
+
+    50% {
+        transform: translateY(-5px) rotate(3deg);
+    }
+}
+
+/* Nút điều khiển */
+.tomtich-controls {
+    display: flex;
+    justify-content: center;
+    margin-bottom: 20px;
+    user-select: none;
+}
+
+.tomtich-btn {
+    background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%);
+    border: none;
+    color: white;
+    font-size: 18px;
+    font-weight: bold;
+    padding: 15px 35px;
+    border-radius: 30px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 5px 15px rgba(76, 175, 80, 0.4);
+    text-transform: uppercase;
+}
+
+.tomtich-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(76, 175, 80, 0.6);
+}
+
+.tomtich-btn:active {
+    transform: translateY(0);
+}
+
+.tomtich-btn.catch {
+    background: linear-gradient(135deg, #ff6b6b 0%, #ee5a6f 100%);
+    box-shadow: 0 5px 15px rgba(255, 107, 107, 0.4);
+    animation: pulse 1s ease-in-out infinite;
+}
+
+@keyframes pulse {
+
+    0%,
+    100% {
+        transform: scale(1);
+    }
+
+    50% {
+        transform: scale(1.05);
+    }
+}
+
+/* Kết quả */
+.tomtich-result {
+    text-align: center;
+    padding: 20px;
+    background: rgba(255, 255, 255, 0.9);
+    border-radius: 15px;
+    margin-bottom: 20px;
+    animation: resultSlideIn 0.5s ease-out;
+}
+
+@keyframes resultSlideIn {
+    from {
+        opacity: 0;
+        transform: translateY(-20px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.result-icon {
+    font-size: 70px;
+    margin-bottom: 10px;
+    animation: iconBounce 0.6s ease-out;
+}
+
+@keyframes iconBounce {
+    0% {
+        transform: scale(0);
+    }
+
+    50% {
+        transform: scale(1.2);
+    }
+
+    100% {
+        transform: scale(1);
+    }
+}
+
+.result-text {
+    font-size: 22px;
+    font-weight: bold;
+}
+
+.result-text.success {
+    color: #00c853;
+    text-shadow: 0 2px 5px rgba(0, 200, 83, 0.3);
+}
+
+.result-text.fail {
+    color: #ff5252;
+    text-shadow: 0 2px 5px rgba(255, 82, 82, 0.3);
+}
+
+/* Hướng dẫn */
+.tomtich-guide {
+    text-align: center;
+    color: #5a4a3a;
+    font-size: 15px;
+    padding: 12px;
+    background: rgba(139, 115, 85, 0.25);
+    border-radius: 10px;
+    backdrop-filter: blur(5px);
+    border: 2px solid rgba(139, 115, 85, 0.4);
+}
+
+.tomtich-guide p {
+    margin: 0;
+    text-shadow: 1px 1px 2px rgba(255, 255, 255, 0.5);
+    font-weight: 600;
+}
+
+/* Hướng dẫn điều khiển */
+.control-instructions {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    width: 100%;
+}
+
+.instruction-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 14px;
+    color: #5a4a3a;
+    font-weight: 600;
+}
+
+.instruction-item kbd {
+    background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%);
+    color: white;
+    padding: 6px 12px;
+    border-radius: 8px;
+    font-weight: bold;
+    font-size: 12px;
+    box-shadow: 0 3px 8px rgba(76, 175, 80, 0.4);
+    min-width: 100px;
+    text-align: center;
+}
+
+/* Progress bar */
+.progress-info {
+    margin-top: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.progress-bar-container {
+    width: 100%;
+    height: 25px;
+    background: rgba(139, 115, 85, 0.3);
+    border-radius: 12px;
+    overflow: hidden;
+    border: 2px solid rgba(139, 115, 85, 0.5);
+}
+
+.progress-bar {
+    height: 100%;
+    background: linear-gradient(90deg,
+            #4CAF50 0%,
+            #66BB6A 50%,
+            #81C784 100%);
+    transition: width 0.3s ease;
+    box-shadow: 0 0 10px rgba(76, 175, 80, 0.6);
+}
+
+.progress-text {
+    font-size: 13px;
+    font-weight: bold;
+    color: #5a4a3a;
+    text-align: center;
+}
+
+
+/* Thời gian còn lại */
+.time-remaining {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    background: linear-gradient(135deg, #2196F3 0%, #1976D2 100%);
+    padding: 8px 20px;
+    border-radius: 20px;
+    margin-bottom: 10px;
+    box-shadow: 0 3px 10px rgba(33, 150, 243, 0.4);
+    transition: all 0.3s ease;
+}
+
+.time-remaining.time-warning {
+    background: linear-gradient(135deg, #ff5252 0%, #f44336 100%);
+    animation: timeWarning 0.5s ease-in-out infinite;
+    box-shadow: 0 3px 10px rgba(255, 82, 82, 0.6);
+}
+
+@keyframes timeWarning {
+
+    0%,
+    100% {
+        transform: scale(1);
+    }
+
+    50% {
+        transform: scale(1.05);
+    }
+}
+
+.time-icon {
+    font-size: 20px;
+    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3));
+}
+
+.time-text {
+    font-size: 18px;
+    font-weight: bold;
+    color: white;
+    text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.5);
+    min-width: 35px;
+    text-align: center;
+}

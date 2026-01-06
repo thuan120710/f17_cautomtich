@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Câu Tôm Tích</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div id="app">
+        <!-- TomTich UI - Game câu tôm tích (Vertical) -->
+        <div v-if="tomtichVisible" id="tomtich-container">
+            <div class="tomtich-wrapper">
+                <button @click="handleTomTichClose" class="tomtich-close-btn">✖</button>
+                
+                <div class="tomtich-scene-vertical">
+                    <!-- Cát bên trái -->
+                    <div class="sand-left-vertical">
+                        <div class="sand-decorations">
+                            <span class="deco">🐚</span>
+                            <span class="deco">⭐</span>
+                        </div>
+                    </div>
+                    
+                    <!-- Hang tôm tích ở giữa (dọc) -->
+                    <div class="cave-vertical" :class="{ 'shake': shrimpPulling }">
+                        <!-- Dây câu - chiều dài thay đổi theo lực căng -->
+                        <div v-if="tomtichGameStarted" class="fishing-line-vertical" :style="{ height: fishingLineHeight + '%' }">
+                            <div class="hook-vertical">🐚</div>
+                        </div>
+                        
+                        <!-- Tôm tích - vị trí thay đổi theo lực căng -->
+                        <div v-if="!tomtichGameEnded && tomtichGameStarted" 
+                             class="shrimp-container" 
+                             :style="{ top: shrimpPosition + '%' }">
+                            <div class="shrimp-icon" :class="{ 'pulling': shrimpPulling }">🦞</div>
+                        </div>
+                        
+                        <!-- Hiệu ứng tôm giật -->
+                        <div v-if="shrimpPulling" class="pull-warning">⚠️ TÔM GIẬT MẠNH!</div>
+                        
+                        <!-- Đáy hang -->
+                        <div class="cave-bottom"></div>
+                    </div>
+                    
+                    <!-- Cát bên phải -->
+                    <div class="sand-right-vertical">
+                        <div class="sand-decorations">
+                            <span class="deco">🌊</span>
+                            <span class="deco">🐚</span>
+                        </div>
+                    </div>
+                    
+                    <!-- Thanh lực căng bên ngoài cát phải -->
+                    <div class="timing-container-outside">
+                        <div v-if="tomtichGameStarted && !tomtichGameEnded" class="tension-bar-container">
+                            <div class="tension-label">LỰC CĂNG</div>
+                            <div class="tension-bar">
+                                <!-- Vùng nguy hiểm trên (lực thấp - tôm thoát) -->
+                                <div class="tension-zone danger-low-top">
+                                    <span class="zone-label">TÔM THOÁT</span>
+                                </div>
+                                <!-- Vùng an toàn (xanh/vàng) -->
+                                <div class="tension-zone safe-zone">
+                                    <span class="zone-label">AN TOÀN</span>
+                                </div>
+                                <!-- Vùng nguy hiểm dưới (lực cao - đứt dây) -->
+                                <div class="tension-zone danger-high-bottom">
+                                    <span class="zone-label">ĐỨT DÂY</span>
+                                </div>
+                                <!-- Thanh lực hiện tại -->
+                                <div class="tension-indicator" :style="{ top: tensionLevel + '%' }">
+                                    <span class="indicator-arrow">◀</span>
+                                    <span class="indicator-value">{{ Math.round(100 - tensionLevel) }}%</span>
+                                    <span class="indicator-arrow">▶</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Nút điều khiển -->
+                <div class="tomtich-controls">
+                    <button v-if="!tomtichGameStarted && !tomtichGameEnded" @click="startTomTichGame" class="tomtich-btn start">
+                        🎣 Bắt đầu câu
+                    </button>
+                    <div v-if="tomtichGameStarted && !tomtichGameEnded" class="control-instructions">
+                        <div class="instruction-item">
+                            <kbd>GIỮ SPACE</kbd> <span>Kéo dây lên (tăng lực)</span>
+                        </div>
+                        <div class="instruction-item">
+                            <kbd>NHẢ SPACE</kbd> <span>Thả lỏng (giảm lực)</span>
+                        </div>
+                        <div class="progress-info">
+                            <div class="time-remaining" :class="{ 'time-warning': timeRemaining <= 5 }">
+                                <span class="time-icon">⏱️</span>
+                                <span class="time-text">{{ Math.ceil(timeRemaining) }}s</span>
+                            </div>
+                            <div class="progress-bar-container">
+                                <div class="progress-bar" :style="{ width: catchProgress + '%' }"></div>
+                            </div>
+                            <span class="progress-text">Tiến độ: {{ Math.round(catchProgress) }}%</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Kết quả -->
+                <div v-if="tomtichGameEnded" class="tomtich-result">
+                    <div class="result-icon">{{ tomtichResultSuccess ? '🦞' : '🗑️' }}</div>
+                    <div class="result-text" :class="tomtichResultSuccess ? 'success' : 'fail'">
+                        {{ resultMessage }}
+                    </div>
+                </div>
+                
+                <!-- Hướng dẫn -->
+                <div v-if="!tomtichGameStarted && !tomtichGameEnded" class="tomtich-guide">
+                    <p><strong>🎮 Cách chơi:</strong></p>
+                    <p>Giữ và nhả phím SPACE để điều khiển lực căng dây câu</p>
+                    <p>Giữ thanh lực trong vùng AN TOÀN để câu tôm tích thành công!</p>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Force reload by adding version query -->
+    <script src="https://cdn.jsdelivr.net/npm/vue@3.3.4/dist/vue.global.prod.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>
