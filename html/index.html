@@ -1,19 +1,43 @@
 <!DOCTYPE html>
 <html lang="vi">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Câu Tôm Tích</title>
     <link rel="stylesheet" href="style.css">
 </head>
+
 <body>
     <div id="app">
         <!-- TomTich UI - Game câu tôm tích (Vertical) -->
         <div v-if="tomtichVisible" id="tomtich-container">
             <div class="tomtich-wrapper">
                 <button @click="handleTomTichClose" class="tomtich-close-btn">✖</button>
-                
-                <div class="tomtich-scene-vertical">
+
+                <!-- Phase 1: Start Prompt -->
+                <div v-if="gamePhase === 'IDLE'" class="start-prompt">
+                    <div class="keyboard-icon">SPACE</div>
+                    <div class="prompt-text">NHẤN SPACE ĐỂ THẢ CÂU</div>
+                </div>
+
+                <!-- Phase 2: Dropping Line -->
+                <div v-if="gamePhase === 'DROPPING'" class="dropping-phase">
+                    <div class="dropping-text">GIỮ SPACE ĐỂ THẢ CÂU</div>
+                    <div class="depth-indicator">{{ Math.round(fishingLineHeight) }}%</div>
+                </div>
+
+                <div v-if="gamePhase === 'WAITING'" class="dropping-phase">
+                    <div class="dropping-text">...ĐANG CHỜ...</div>
+                    <div class="subtitle">(Vẫn giữ Space)</div>
+                </div>
+
+                <div v-if="gamePhase === 'BITING'" class="dropping-phase item-biting">
+                    <div class="dropping-text blink">TÔM CẮN CÂU!!</div>
+                    <div class="subtitle">NHẢ SPACE NGAY!</div>
+                </div>
+
+                <div class="tomtich-scene-vertical" :class="{ 'blur-bg': gamePhase === 'IDLE' }">
                     <!-- Cát bên trái -->
                     <div class="sand-left-vertical">
                         <div class="sand-decorations">
@@ -21,28 +45,28 @@
                             <span class="deco">⭐</span>
                         </div>
                     </div>
-                    
+
                     <!-- Hang tôm tích ở giữa (dọc) -->
                     <div class="cave-vertical" :class="{ 'shake': shrimpPulling }">
                         <!-- Dây câu - chiều dài thay đổi theo lực căng -->
-                        <div v-if="tomtichGameStarted" class="fishing-line-vertical" :style="{ height: fishingLineHeight + '%' }">
-                            <div class="hook-vertical">🐚</div>
+                        <div v-if="['FISHING', 'RESULT', 'DROPPING', 'WAITING', 'BITING'].includes(gamePhase)"
+                            class="fishing-line-vertical" :style="{ height: fishingLineHeight + '%' }">
+                            <div class="hook-vertical" :class="{ 'shake': gamePhase === 'BITING' }">🐚</div>
                         </div>
-                        
+
                         <!-- Tôm tích - vị trí thay đổi theo lực căng -->
-                        <div v-if="!tomtichGameEnded && tomtichGameStarted" 
-                             class="shrimp-container" 
-                             :style="{ top: shrimpPosition + '%' }">
-                            <div class="shrimp-icon" :class="{ 'pulling': shrimpPulling }">🦞</div>
+                        <div v-if="gamePhase === 'FISHING'" class="shrimp-container"
+                            :style="{ top: shrimpPosition + '%' }">
+                            <div class="shrimp-icon" :class="{ 'pulling': shrimpPulling }">{{ currentShrimpIcon }}</div>
                         </div>
-                        
+
                         <!-- Hiệu ứng tôm giật -->
                         <div v-if="shrimpPulling" class="pull-warning">⚠️ TÔM GIẬT MẠNH!</div>
-                        
+
                         <!-- Đáy hang -->
                         <div class="cave-bottom"></div>
                     </div>
-                    
+
                     <!-- Cát bên phải -->
                     <div class="sand-right-vertical">
                         <div class="sand-decorations">
@@ -50,10 +74,10 @@
                             <span class="deco">🐚</span>
                         </div>
                     </div>
-                    
+
                     <!-- Thanh lực căng bên ngoài cát phải -->
                     <div class="timing-container-outside">
-                        <div v-if="tomtichGameStarted && !tomtichGameEnded" class="tension-bar-container">
+                        <div v-if="gamePhase === 'FISHING'" class="tension-bar-container">
                             <div class="tension-label">LỰC CĂNG</div>
                             <div class="tension-bar">
                                 <!-- Vùng nguy hiểm trên (lực thấp - tôm thoát) -->
@@ -78,13 +102,15 @@
                         </div>
                     </div>
                 </div>
-                
+
                 <!-- Nút điều khiển -->
                 <div class="tomtich-controls">
-                    <button v-if="!tomtichGameStarted && !tomtichGameEnded" @click="startTomTichGame" class="tomtich-btn start">
+                    <!-- REMOVED OLD BUTTON, NOW USING SPACE -->
+                    <!-- <button v-if="!tomtichGameStarted && !tomtichGameEnded" @click="startTomTichGame" class="tomtich-btn start">
                         🎣 Bắt đầu câu
-                    </button>
-                    <div v-if="tomtichGameStarted && !tomtichGameEnded" class="control-instructions">
+                    </button> -->
+
+                    <div v-if="gamePhase === 'FISHING'" class="control-instructions">
                         <div class="instruction-item">
                             <kbd>GIỮ SPACE</kbd> <span>Kéo dây lên (tăng lực)</span>
                         </div>
@@ -103,15 +129,15 @@
                         </div>
                     </div>
                 </div>
-                
+
                 <!-- Kết quả -->
-                <div v-if="tomtichGameEnded" class="tomtich-result">
-                    <div class="result-icon">{{ tomtichResultSuccess ? '🦞' : '🗑️' }}</div>
+                <div v-if="gamePhase === 'RESULT'" class="tomtich-result">
+                    <div class="result-icon">{{ tomtichResultSuccess ? currentShrimpIcon : '🗑️' }}</div>
                     <div class="result-text" :class="tomtichResultSuccess ? 'success' : 'fail'">
                         {{ resultMessage }}
                     </div>
                 </div>
-                
+
                 <!-- Hướng dẫn -->
                 <div v-if="!tomtichGameStarted && !tomtichGameEnded" class="tomtich-guide">
                     <p><strong>🎮 Cách chơi:</strong></p>
@@ -121,9 +147,10 @@
             </div>
         </div>
     </div>
-    
+
     <!-- Force reload by adding version query -->
     <script src="https://cdn.jsdelivr.net/npm/vue@3.3.4/dist/vue.global.prod.js"></script>
     <script src="script.js"></script>
 </body>
+
 </html>

@@ -10,7 +10,7 @@ local NOTIFICATION_TYPE = "STANDALONE"  -- Dùng notification mặc định GTA
 -- Điểm câu tôm tích
 local TOMTICH_POINT = vector3(-1903.75, -827.08, 0.56)
 
-local SPAWN_COOLDOWN = 120  -- 2 phút (120 giây)
+local SPAWN_COOLDOWN = 5  -- 5 giây (Test)
 local INTERACTION_DISTANCE = 2.0  -- Khoảng cách tương tác
 
 -- Khởi tạo framework (nếu cần)
@@ -163,7 +163,7 @@ end)
 
 -- Callback từ NUI
 RegisterNUICallback('tomtichAttempt', function(data, cb)
-    TriggerServerEvent('tomtich:attempt', data.success)
+    TriggerServerEvent('tomtich:attempt', data.success, data.item)
     cb('ok')
 end)
 

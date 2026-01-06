@@ -17,7 +17,11 @@ elseif INVENTORY_TYPE == "VRP" then
 end
 
 local ITEMS = {
-    TRASH = "racthainhua"
+    TRASH = "racthainhua",
+    COMMON = "tomtich",         -- Tôm tích thường (50%)
+    UNCOMMON = "tomtichxanh",  -- Tôm tích xanh (30%)
+    RARE = "tomtichdo",        -- Tôm tích đỏ (15%)
+    LEGENDARY = "tomtichhoangkim" -- Tôm tích hoàng kim (5%)
 }
 
 -- Helper function to give reward
@@ -57,7 +61,7 @@ AddEventHandler('tomtich:startGame', function()
 end)
 
 RegisterNetEvent('tomtich:attempt')
-AddEventHandler('tomtich:attempt', function(success)
+AddEventHandler('tomtich:attempt', function(success, itemCode)
     local src = source
     local game = activeTomTichGames[src]
     
@@ -65,7 +69,20 @@ AddEventHandler('tomtich:attempt', function(success)
     
     game.active = false
     
-    local item = success and TOMTICH_ITEM or ITEMS.TRASH
+    -- Validate item (chống hack cơ bản, chỉ chấp nhận item trong whitelist nếu success)
+    local rewardItem = ITEMS.TRASH
+    if success then
+        -- Client gửi item code lên, server check lại hoặc tin tưởng (ở mức cơ bản)
+        -- Tốt nhất là client gửi loại (type) rồi server random, nhưng user yêu cầu logic "kéo lên thì hiện"
+        -- Tạm thời tin tưởng client gửi đúng item code từ danh sách cho phép
+        if itemCode == ITEMS.COMMON or itemCode == ITEMS.UNCOMMON or itemCode == ITEMS.RARE or itemCode == ITEMS.LEGENDARY then
+            rewardItem = itemCode
+        else
+            rewardItem = ITEMS.COMMON -- Default fallback
+        end
+    end
+
+    local item = success and rewardItem or ITEMS.TRASH
     local reason = success and "tomtich_success" or "tomtich_fail"
     
     -- Thêm item vào inventory

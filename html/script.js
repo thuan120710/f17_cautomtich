@@ -31,76 +31,71 @@ SOUNDS.tension.volume = 0.4;
 // ============================================
 const app = createApp({
     setup() {
-        // Tomtich state
+        // App State
         const tomtichVisible = ref(false);
-        const tomtichStatus = ref('Sẵn sàng');
-
-        // Tomtich game state - CƠ CHẾ MỚI
-        const tomtichGameStarted = ref(false);
-        const tomtichGameEnded = ref(false);
-        const tomtichResultSuccess = ref(false);
+        const gamePhase = ref('IDLE'); // IDLE, DROPPING, FISHING, RESULT
+        const tomtichStatus = ref('Sẵn sàng'); // Legacy UI status if needed
         const resultMessage = ref('');
+        const tomtichResultSuccess = ref(false);
 
-        // Tension system (Lực căng dây)
-        const tensionLevel = ref(50); // 0-100, 50 là giữa
-        const catchProgress = ref(0); // 0-100, tiến độ câu tôm
-        const timeRemaining = ref(30); // Thời gian còn lại (giây)
+        // Game Configuration
+        const SHRIMP_TYPES = [
+            { id: 'tomtich', name: 'Tôm Tích', icon: '🦞', chance: 50 },
+            { id: 'tomtichxanh', name: 'Tôm Tích Xanh', icon: '🦐', chance: 30 }, // Blue/Green Shrimp
+            { id: 'tomtichdo', name: 'Tôm Tích Đỏ', icon: '🦑', chance: 15 },    // Red/Special
+            { id: 'tomtichhoangkim', name: 'Tôm Tích Hoàng Kim', icon: '👑', chance: 5 } // Golden
+        ];
+
+        // Game State
+        const currentShrimp = ref(SHRIMP_TYPES[0]);
+        const currentShrimpIcon = ref('🦞');
+
+        // Tension system
+        const tensionLevel = ref(50);
+        const catchProgress = ref(0);
+        const timeRemaining = ref(30);
         const isHoldingSpace = ref(false);
 
         // Visual effects
-        const fishingLineHeight = ref(100); // Chiều dài dây câu
-        const shrimpPosition = ref(80); // Vị trí tôm (% từ trên xuống)
-        const shrimpPulling = ref(false); // Tôm đang giật
-        const shrimpResistance = ref(0.5); // Sức kháng của tôm (0-1)
+        const fishingLineHeight = ref(100);
+        const shrimpPosition = ref(80);
+        const shrimpPulling = ref(false);
+        const shrimpResistance = ref(0.5);
 
-        // Animation
+        // Animation Frames & Time
         let tomtichAnimationFrame = null;
         let lastUpdateTime = 0;
         let gameStartTime = 0;
 
-        // Game constants
-        const TENSION_SAFE_MIN = 30; // Dưới 30% = tôm thoát
-        const TENSION_SAFE_MAX = 70; // Trên 70% = đứt dây
-        const GAME_TIME_LIMIT = 30000; // 30 giây giới hạn thời gian
-        const CATCH_DURATION = 20000; // 15 giây để đầy tiến độ (nếu chơi hoàn hảo)
-        const PULL_INTERVAL_MIN = 2000; // Tôm giật ít nhất 2s một lần
-        const PULL_INTERVAL_MAX = 4000; // Tôm giật nhiều nhất 4s một lần
+        // Constants
+        const TENSION_SAFE_MIN = 30;
+        const TENSION_SAFE_MAX = 70;
+        const GAME_TIME_LIMIT = 30000;
+        const CATCH_DURATION = 20000;
+        const PULL_INTERVAL_MIN = 2000;
+        const PULL_INTERVAL_MAX = 4000;
 
-        // Game keys state
-        const oceanMusicStarted = ref(false);
+        // Sound Helper
+        const stopAllSounds = () => {
+            SOUNDS.ocean.pause(); SOUNDS.ocean.currentTime = 0;
+            SOUNDS.reelIn.pause(); SOUNDS.reelIn.currentTime = 0;
+            SOUNDS.tension.pause(); SOUNDS.tension.currentTime = 0;
+            SOUNDS.shrimpPull.pause(); SOUNDS.shrimpPull.currentTime = 0;
+        };
 
         // ============================================
-        // GAME LOGIC METHODS
+        // LOGIC
         // ============================================
+
+        const closeGameUI = () => {
+            tomtichVisible.value = false;
+            gamePhase.value = 'IDLE';
+            resetGameState();
+            stopAllSounds();
+        };
 
         const handleTomTichClose = () => {
-            // Reset toàn bộ state
-            tomtichVisible.value = false;
-            tomtichGameStarted.value = false;
-            tomtichGameEnded.value = false;
-            tomtichResultSuccess.value = false;
-            resultMessage.value = '';
-            tensionLevel.value = 50;
-            catchProgress.value = 0;
-            timeRemaining.value = 30;
-            fishingLineHeight.value = 100;
-            shrimpPosition.value = 50;
-            shrimpPulling.value = false;
-            isHoldingSpace.value = false;
-
-            // Hủy animation frame nếu có
-            if (tomtichAnimationFrame) {
-                cancelAnimationFrame(tomtichAnimationFrame);
-                tomtichAnimationFrame = null;
-            }
-
-            SOUNDS.ocean.pause();
-            SOUNDS.ocean.currentTime = 0;
-            SOUNDS.reelIn.pause();
-            SOUNDS.reelIn.currentTime = 0;
-            SOUNDS.tension.pause();
-            SOUNDS.tension.currentTime = 0;
-
+            closeGameUI();
             fetch(`https://${getParentResourceName()}/closeTomTich`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -108,35 +103,212 @@ const app = createApp({
             });
         };
 
-        const startTomTichGame = () => {
-            tomtichGameStarted.value = true;
-            tomtichGameEnded.value = false;
+        const resetGameState = () => {
             tensionLevel.value = 50;
             catchProgress.value = 0;
             timeRemaining.value = 30;
-            fishingLineHeight.value = 100;
-            shrimpPosition.value = 50; // Tôm bắt đầu ở 50% (giữa)
+            fishingLineHeight.value = 0; // Start at 0 for drop phase
+            shrimpPosition.value = 50;
             shrimpPulling.value = false;
             isHoldingSpace.value = false;
+            resultMessage.value = '';
 
-            // Random sức kháng của tôm
-            shrimpResistance.value = 0.4 + Math.random() * 0.4; // 0.4 - 0.8
+            if (tomtichAnimationFrame) {
+                cancelAnimationFrame(tomtichAnimationFrame);
+                tomtichAnimationFrame = null;
+            }
+        };
 
+        // Step 1: User presses Space in IDLE -> Starts Dropping
+        const dropDepth = ref(0); // 0-100%
+
+        const startDropLine = () => {
+            if (gamePhase.value !== 'IDLE') return;
+
+            gamePhase.value = 'DROPPING';
+            dropDepth.value = 0;
+            fishingLineHeight.value = 0;
+
+            SOUNDS.ocean.play().catch(() => { });
+
+            lastUpdateTime = Date.now();
+            updateDropLoop();
+        };
+
+        const updateDropLoop = () => {
+            if (gamePhase.value !== 'DROPPING') return;
+
+            const now = Date.now();
+            const deltaTime = (now - lastUpdateTime) / 1000;
+            lastUpdateTime = now;
+
+            if (isHoldingSpace.value) {
+                // Holding = Drop line down
+                dropDepth.value += 40 * deltaTime;
+                if (SOUNDS.reelIn.paused) SOUNDS.reelIn.play().catch(() => { });
+            } else {
+                // Released = Retract line up
+                dropDepth.value -= 60 * deltaTime;
+                if (!SOUNDS.reelIn.paused) {
+                    SOUNDS.reelIn.pause();
+                    SOUNDS.reelIn.currentTime = 0;
+                }
+                if (dropDepth.value <= 0) {
+                    dropDepth.value = 0;
+                    gamePhase.value = 'IDLE';
+                    fishingLineHeight.value = 0;
+                    if (tomtichAnimationFrame) cancelAnimationFrame(tomtichAnimationFrame);
+                    tomtichAnimationFrame = null;
+                    return;
+                }
+            }
+
+            dropDepth.value = Math.max(0, Math.min(100, dropDepth.value));
+            fishingLineHeight.value = dropDepth.value;
+
+            if (dropDepth.value >= 100) {
+                startWaitingPhase();
+                return;
+            }
+
+            tomtichAnimationFrame = requestAnimationFrame(updateDropLoop);
+        };
+
+        // PHASE: WAITING (Hold Space 5-8s)
+        const waitTimer = ref(0);
+
+        const startWaitingPhase = () => {
+            gamePhase.value = 'WAITING';
+            // Random wait 5-8s
+            waitTimer.value = 5000 + Math.random() * 3000;
+            lastUpdateTime = Date.now();
+
+            // Stop reel sound
+            if (!SOUNDS.reelIn.paused) {
+                SOUNDS.reelIn.pause();
+                SOUNDS.reelIn.currentTime = 0;
+            }
+
+            updateWaitLoop();
+        };
+
+        const updateWaitLoop = () => {
+            if (gamePhase.value !== 'WAITING') return;
+
+            const now = Date.now();
+            const deltaTime = (now - lastUpdateTime); // ms
+            lastUpdateTime = now;
+
+            // Rule: Must HOLD Space
+            if (!isHoldingSpace.value) {
+                // Failed: Released too early -> Retract
+                gamePhase.value = 'DROPPING';
+                dropDepth.value = 99; // Slightly up
+                updateDropLoop();
+                return;
+            }
+
+            waitTimer.value -= deltaTime;
+            if (waitTimer.value <= 0) {
+                startBitingPhase();
+                return;
+            }
+
+            tomtichAnimationFrame = requestAnimationFrame(updateWaitLoop);
+        };
+
+        // PHASE: BITING (Release Space within 2s)
+        const biteTimer = ref(0);
+
+        const startBitingPhase = () => {
+            gamePhase.value = 'BITING';
+            biteTimer.value = 2000; // 2s window
+            shrimpPulling.value = true; // Shake effect
+            SOUNDS.shrimpPull.play().catch(() => { });
+
+            lastUpdateTime = Date.now();
+            updateBiteLoop();
+        };
+
+        const updateBiteLoop = () => {
+            if (gamePhase.value !== 'BITING') return;
+
+            const now = Date.now();
+            const deltaTime = (now - lastUpdateTime); // ms
+            lastUpdateTime = now;
+
+            // Check Input: Released Space?
+            if (!isHoldingSpace.value) {
+                // Success! Hooked!
+                shrimpPulling.value = false;
+                startFishingPhase();
+                return;
+            }
+
+            biteTimer.value -= deltaTime;
+            if (biteTimer.value <= 0) {
+                // Failed: Too slow / Didn't release -> Lose
+                shrimpPulling.value = false;
+                endTomTichGame(false, 'Tôm đã thoát! (Phản xạ chậm)');
+                return;
+            }
+
+            tomtichAnimationFrame = requestAnimationFrame(updateBiteLoop);
+        };
+
+        // Step 2: Dropping finished -> Hook set -> Select Shrimp -> Start Minigame
+        const startFishingPhase = () => {
+            gamePhase.value = 'FISHING';
+            resetGameState();
+            fishingLineHeight.value = 100; // Force full line for game start
+
+            // Stop drop sound
+            if (!SOUNDS.reelIn.paused) {
+                SOUNDS.reelIn.pause();
+                SOUNDS.reelIn.currentTime = 0;
+            }
+
+            // Random shrimp selection
+            const rand = Math.random() * 100; // 0-100
+            let cumulative = 0;
+            let selected = SHRIMP_TYPES[0];
+
+            for (const type of SHRIMP_TYPES) {
+                cumulative += type.chance;
+                if (rand <= cumulative) {
+                    selected = type;
+                    break;
+                }
+            }
+            currentShrimp.value = selected;
+            currentShrimpIcon.value = selected.icon;
+
+            // Difficulty adjustment based on rarity?
+            // Rare shrimps could be harder
+            let difficultyMult = 1.0;
+            if (selected.id === 'tomtich_hoangkim') difficultyMult = 1.3;
+            else if (selected.id === 'tomtich_do') difficultyMult = 1.1;
+
+            shrimpResistance.value = (0.4 + Math.random() * 0.4) * difficultyMult;
+
+            // Start loop
             lastUpdateTime = Date.now();
             gameStartTime = Date.now();
             scheduleShrimpPull();
             updateTensionLoop();
 
-            SOUNDS.ocean.play().catch(() => { });
+            // Sound effect for hook
+            // Maybe play a splash or "bite" sound here?
+            SOUNDS.shrimpPull.play().catch(() => { });
         };
 
         const scheduleShrimpPull = () => {
-            if (!tomtichGameStarted.value || tomtichGameEnded.value) return;
+            if (gamePhase.value !== 'FISHING') return;
 
             const nextPullTime = PULL_INTERVAL_MIN + Math.random() * (PULL_INTERVAL_MAX - PULL_INTERVAL_MIN);
 
             setTimeout(() => {
-                if (tomtichGameStarted.value && !tomtichGameEnded.value) {
+                if (gamePhase.value === 'FISHING') {
                     triggerShrimpPull();
                     scheduleShrimpPull();
                 }
@@ -145,61 +317,41 @@ const app = createApp({
 
         const triggerShrimpPull = () => {
             shrimpPulling.value = true;
-
-            // Phát âm thanh tôm giật
             SOUNDS.shrimpPull.currentTime = 0;
             SOUNDS.shrimpPull.play().catch(() => { });
-
-            // Tôm giật làm tăng lực căng đột ngột
             tensionLevel.value = Math.min(tensionLevel.value + 15 + Math.random() * 15, 95);
-
-            setTimeout(() => {
-                shrimpPulling.value = false;
-            }, 800);
+            setTimeout(() => { shrimpPulling.value = false; }, 800);
         };
 
         const updateTensionLoop = () => {
-            if (!tomtichGameStarted.value || tomtichGameEnded.value) return;
+            if (gamePhase.value !== 'FISHING') return;
 
             const now = Date.now();
-            const deltaTime = (now - lastUpdateTime) / 1000; // seconds
+            const deltaTime = (now - lastUpdateTime) / 1000;
             lastUpdateTime = now;
 
-            // Cập nhật thời gian còn lại
             const elapsed = (now - gameStartTime) / 1000;
             timeRemaining.value = Math.max(0, 30 - elapsed);
 
-            // Cập nhật lực căng
+            // Control physics
             if (isHoldingSpace.value) {
-                // Giữ phím = kéo lên = tăng lực
-                tensionLevel.value += 25 * deltaTime;
-
-                // Phát âm thanh kéo dây khi giữ phím
-                if (SOUNDS.reelIn.paused) {
-                    SOUNDS.reelIn.play().catch(() => { });
-                }
+                tensionLevel.value += 35 * deltaTime; // Slightly easier to pull up
+                if (SOUNDS.reelIn.paused) SOUNDS.reelIn.play().catch(() => { });
             } else {
-                // Nhả phím = thả lỏng = giảm lực
-                tensionLevel.value -= 20 * deltaTime;
-
-                // Dừng âm thanh kéo dây khi nhả phím
+                tensionLevel.value -= 25 * deltaTime; // Slower drop
                 if (!SOUNDS.reelIn.paused) {
                     SOUNDS.reelIn.pause();
                     SOUNDS.reelIn.currentTime = 0;
                 }
             }
 
-            // Tôm kháng cự (tự động kéo xuống)
+            // Resistance
             tensionLevel.value -= shrimpResistance.value * 15 * deltaTime;
-
-            // Giới hạn tension
             tensionLevel.value = Math.max(0, Math.min(100, tensionLevel.value));
 
-            // Phát âm thanh cảnh báo khi lực căng nguy hiểm
+            // Sound warning
             if (tensionLevel.value >= 85 || tensionLevel.value <= 15) {
-                if (SOUNDS.tension.paused) {
-                    SOUNDS.tension.play().catch(() => { });
-                }
+                if (SOUNDS.tension.paused) SOUNDS.tension.play().catch(() => { });
             } else {
                 if (!SOUNDS.tension.paused) {
                     SOUNDS.tension.pause();
@@ -207,49 +359,34 @@ const app = createApp({
                 }
             }
 
-            // Cập nhật vị trí tôm dựa trên lực căng (ĐẢO NGƯỢC)
-            // Lực cao (100) = tôm kéo xuống mạnh = tôm ở dưới (80%)
-            // Lực thấp (0) = dây lỏng = tôm ở trên (20%)
-            shrimpPosition.value = 20 + (tensionLevel.value * 0.6); // 20% -> 80%
-
-            // Cập nhật chiều dài dây câu theo vị trí tôm
+            // Visuals
+            shrimpPosition.value = 20 + (tensionLevel.value * 0.6);
             fishingLineHeight.value = shrimpPosition.value + 10;
 
-            // Check vùng an toàn
+            // Progress
             if (tensionLevel.value >= TENSION_SAFE_MIN && tensionLevel.value <= TENSION_SAFE_MAX) {
-                // Trong vùng an toàn = tăng tiến độ
                 catchProgress.value += 100 / (CATCH_DURATION / 1000) * deltaTime;
             } else {
-                // Ngoài vùng an toàn = giảm tiến độ
                 catchProgress.value -= 50 / (CATCH_DURATION / 1000) * deltaTime;
             }
-
             catchProgress.value = Math.max(0, Math.min(100, catchProgress.value));
 
-            // Check điều kiện kết thúc
+            // End Conditions
             if (tensionLevel.value <= 5) {
-                // Lực quá thấp (thanh ở trên) = tôm thoát
                 endTomTichGame(false, 'Tôm tích đã chui vào hang!');
-                return;
             } else if (tensionLevel.value >= 95) {
-                // Lực quá cao (thanh ở dưới) = đứt dây
                 endTomTichGame(false, 'Dây câu đã đứt!');
-                return;
             } else if (catchProgress.value >= 100) {
-                // Hoàn thành = thắng
-                endTomTichGame(true, 'Câu được Tôm Tích!');
-                return;
+                endTomTichGame(true, `Câu được ${currentShrimp.value.name}!`);
             } else if (timeRemaining.value <= 0) {
-                // Hết thời gian = tôm trốn vào hang
                 endTomTichGame(false, 'Tôm tích đã trốn vào hang!');
-                return;
+            } else {
+                tomtichAnimationFrame = requestAnimationFrame(updateTensionLoop);
             }
-
-            tomtichAnimationFrame = requestAnimationFrame(updateTensionLoop);
         };
 
         const endTomTichGame = (success, message) => {
-            tomtichGameEnded.value = true;
+            gamePhase.value = 'RESULT';
             tomtichResultSuccess.value = success;
             resultMessage.value = message;
 
@@ -257,97 +394,47 @@ const app = createApp({
                 cancelAnimationFrame(tomtichAnimationFrame);
             }
 
-            SOUNDS.ocean.pause();
-            SOUNDS.ocean.currentTime = 0;
-            SOUNDS.reelIn.pause();
-            SOUNDS.reelIn.currentTime = 0;
-            SOUNDS.tension.pause();
-            SOUNDS.tension.currentTime = 0;
+            stopAllSounds();
 
-            if (success) {
-                SOUNDS.win.play().catch(() => { });
-            } else {
-                SOUNDS.lose.play().catch(() => { });
-            }
+            if (success) SOUNDS.win.play().catch(() => { });
+            else SOUNDS.lose.play().catch(() => { });
 
+            // Send full object or just ID
             fetch(`https://${getParentResourceName()}/tomtichAttempt`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ success: success })
+                body: JSON.stringify({
+                    success: success,
+                    item: currentShrimp.value.id
+                })
             });
         };
 
-        const getParentResourceName = () => {
-            return 'f17_cautomtich';
-        };
+        const getParentResourceName = () => 'f17_cautomtich';
 
-        // ============================================
-        // MESSAGE HANDLER
-        // ============================================
+        // Event Handling
         const handleMessage = (event) => {
-            const data = event.data;
-
-            switch (data.action) {
-                case 'showTomTich':
-                    // Reset state khi mở UI mới
-                    tomtichGameStarted.value = false;
-                    tomtichGameEnded.value = false;
-                    tomtichResultSuccess.value = false;
-                    resultMessage.value = '';
-                    tensionLevel.value = 50;
-                    catchProgress.value = 0;
-                    fishingLineHeight.value = 0;
-                    shrimpPulling.value = false;
-                    isHoldingSpace.value = false;
-
-                    // Hủy animation frame cũ nếu có
-                    if (tomtichAnimationFrame) {
-                        cancelAnimationFrame(tomtichAnimationFrame);
-                        tomtichAnimationFrame = null;
-                    }
-
-                    tomtichVisible.value = true;
-                    tomtichStatus.value = 'Sẵn sàng';
-                    break;
-                case 'hideTomTich':
-                    // Reset state khi đóng từ server
-                    tomtichGameStarted.value = false;
-                    tomtichGameEnded.value = false;
-                    tomtichResultSuccess.value = false;
-                    resultMessage.value = '';
-                    tensionLevel.value = 50;
-                    catchProgress.value = 0;
-                    fishingLineHeight.value = 0;
-                    shrimpPulling.value = false;
-                    isHoldingSpace.value = false;
-
-                    if (tomtichAnimationFrame) {
-                        cancelAnimationFrame(tomtichAnimationFrame);
-                        tomtichAnimationFrame = null;
-                    }
-
-                    tomtichVisible.value = false;
-                    break;
-                case 'tomtichResult':
-                    tomtichStatus.value = data.success ? 'Thành công!' : 'Thất bại!';
-                    break;
+            if (event.data.action === 'showTomTich') {
+                resetGameState();
+                gamePhase.value = 'IDLE';
+                tomtichVisible.value = true;
+            } else if (event.data.action === 'hideTomTich') {
+                closeGameUI();
             }
         };
 
         const handleKeydown = (e) => {
-            if (e.key === 'Escape') {
-                if (tomtichVisible.value) {
-                    // Reset state khi nhấn ESC
-                    if (tomtichAnimationFrame) {
-                        cancelAnimationFrame(tomtichAnimationFrame);
-                        tomtichAnimationFrame = null;
-                    }
-                    handleTomTichClose();
-                }
+            if (e.key === 'Escape' && tomtichVisible.value) {
+                handleTomTichClose();
             }
-            if (e.code === 'Space' && tomtichGameStarted.value && !tomtichGameEnded.value) {
-                e.preventDefault();
-                isHoldingSpace.value = true;
+            if (e.code === 'Space') {
+                isHoldingSpace.value = true; // Always set true on press
+
+                if (gamePhase.value === 'IDLE') {
+                    startDropLine();
+                } else if (['FISHING', 'DROPPING', 'WAITING', 'BITING'].includes(gamePhase.value)) {
+                    e.preventDefault();
+                }
             }
         };
 
@@ -357,9 +444,6 @@ const app = createApp({
             }
         };
 
-        // ============================================
-        // LIFECYCLE
-        // ============================================
         onMounted(() => {
             window.addEventListener('message', handleMessage);
             document.addEventListener('keydown', handleKeydown);
@@ -374,9 +458,7 @@ const app = createApp({
 
         return {
             tomtichVisible,
-            tomtichStatus,
-            tomtichGameStarted,
-            tomtichGameEnded,
+            gamePhase, // New
             tomtichResultSuccess,
             resultMessage,
             tensionLevel,
@@ -385,8 +467,9 @@ const app = createApp({
             fishingLineHeight,
             shrimpPosition,
             shrimpPulling,
-            startTomTichGame,
-            handleTomTichClose
+            currentShrimpIcon, // New
+            handleTomTichClose,
+            startTomTichGame: () => { /* No-op, auto start via space */ }
         };
     }
 });

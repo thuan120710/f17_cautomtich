@@ -60,6 +60,21 @@ body {
     z-index: 10;
 }
 
+.dropping-phase.item-biting .dropping-text {
+    color: #ff5252;
+    font-size: 32px;
+}
+
+.blink {
+    animation: blinker 0.2s linear infinite;
+}
+
+@keyframes blinker {
+    50% {
+        opacity: 0;
+    }
+}
+
 .tomtich-close-btn:hover {
     background: rgba(255, 100, 100, 0.8);
     color: white;
