@@ -198,10 +198,10 @@ const app = createApp({
 
                 showTunnelInstruction.value = true;
                 
-                // Auto hide instruction after 5 seconds
-                setTimeout(() => {
-                    showTunnelInstruction.value = false;
-                }, 5000);
+                // Không tự động ẩn - hiển thị cố định
+                // setTimeout(() => {
+                //     showTunnelInstruction.value = false;
+                // }, 5000);
 
                 // Add Listeners
                 canvas.addEventListener('mousemove', onTunnelMouseMove);

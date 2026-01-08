@@ -18,11 +18,9 @@
 
                 <!-- Phase 1: Start Prompt -->
                 <div v-if="gamePhase === 'IDLE'" class="start-prompt">
-                    <div class="game-title">🦞 CÂU TÔM TÍCH 🦞</div>
+                    <div class="game-title">🦞 CÂU TÔM TÍCH</div>
                     <div v-if="!tunnelCompleted" class="phase-badge">GIAI ĐOẠN 1</div>
                     <div v-else class="phase-badge phase-2">GIAI ĐOẠN 2</div>
-                    <div class="keyboard-icon">SPACE</div>
-                    <div class="prompt-text">{{ tunnelCompleted ? 'NHẤN SPACE ĐỂ THẢ CÂU' : 'NHẤN SPACE ĐỂ BẮT ĐẦU' }}</div>
                     <div v-if="!tunnelCompleted" class="game-instructions">
                         <div class="instruction-step">
                             <span class="step-number">1</span>
@@ -42,6 +40,7 @@
                         <div class="completed-text">Đã qua hang thành công!</div>
                         <div class="next-step">Tiếp theo: Thả dây câu xuống đáy</div>
                     </div>
+                    <div class="start-button">{{ tunnelCompleted ? 'NHẤN SPACE ĐỂ THẢ CÂU' : 'NHẤN SPACE ĐỂ BẮT ĐẦU' }}</div>
                 </div>
 
                 <!-- Phase 2: Dropping Line -->
@@ -276,50 +275,49 @@
                             <div class="status-icon">{{ tunnelMessage.includes('✅') ? '✅' : '⚠️' }}</div>
                             <div class="status-text">{{ tunnelMessage.replace('✅', '').trim() }}</div>
                         </div>
-
-                        <!-- Normal Status -->
-                        <div v-else class="tunnel-status-message normal">
-                            <div class="status-icon">🎯</div>
-                            <div class="status-text">Giữ chuột trái để thả xuống - Di chuyển chuột để điều khiển</div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Instructions (Top Left) -->
-                <div class="tunnel-instruction-enhanced" v-if="showTunnelInstruction">
-                    <div class="instruction-header">
-                        <span class="header-icon">🎯</span>
-                        <h2>GIAI ĐOẠN 1: ĐI QUA HANG</h2>
-                    </div>
-                    <div class="instruction-content">
-                        <div class="control-item">
-                            <div class="control-icon">🖱️</div>
-                            <div class="control-desc">
-                                <strong>Giữ chuột trái</strong>
-                                <span>Thả móc câu xuống</span>
-                            </div>
-                        </div>
-                        <div class="control-item">
-                            <div class="control-icon">↔️</div>
-                            <div class="control-desc">
-                                <strong>Di chuyển chuột</strong>
-                                <span>Điều khiển móc né hang</span>
-                            </div>
-                        </div>
-                        <div class="control-item">
-                            <div class="control-icon">🎯</div>
-                            <div class="control-desc">
-                                <strong>Ở giữa đường</strong>
-                                <span>Tăng combo điểm</span>
-                            </div>
-                        </div>
-                        <div class="warning-box">
-                            <span class="warning-icon">⚠️</span>
-                            <span>Đụng hang = Thu dây lại!</span>
-                        </div>
                     </div>
                 </div>
             </div>
+
+            <!-- Instructions Panel - Separate (Outside tunnel container) -->
+            <div v-if="gamePhase === 'TUNNEL_NAV' && showTunnelInstruction" class="tunnel-instruction-panel-outside">
+                <div class="instruction-header">
+                    <span class="header-icon">🎯</span>
+                    <h2>GIAI ĐOẠN 1: ĐI QUA HANG</h2>
+                </div>
+                <div class="instruction-content">
+                    <div class="control-item">
+                        <div class="control-icon">🖱️</div>
+                        <div class="control-desc">
+                            <strong>Giữ chuột trái</strong>
+                            <span>Thả móc câu xuống</span>
+                        </div>
+                    </div>
+                    <div class="control-item">
+                        <div class="control-icon">↔️</div>
+                        <div class="control-desc">
+                            <strong>Di chuyển chuột</strong>
+                            <span>Điều khiển móc né hang</span>
+                        </div>
+                    </div>
+                    <div class="control-item">
+                        <div class="control-icon">🎯</div>
+                        <div class="control-desc">
+                            <strong>Ở giữa đường</strong>
+                            <span>Tăng combo điểm</span>
+                        </div>
+                    </div>
+                    <div class="warning-box">
+                        <span class="warning-icon">⚠️</span>
+                        <span>Đụng hang = Thu dây lại!</span>
+                    </div>
+                    <div class="instruction-guide-text">
+                        <div class="guide-icon">🎯</div>
+                        <div class="guide-text">Giữ chuột trái để thả xuống - Di chuyển chuột để điều khiển</div>
+                    </div>
+                </div>
+            </div>
+        </div>
         </div>
     </div>
 
