@@ -893,7 +893,7 @@ body {
 /* Phase Indicators */
 .dropping-phase {
     position: absolute;
-    top: 15%;
+    top: 80px;
     left: 50%;
     transform: translateX(-50%);
     text-align: center;
@@ -1105,7 +1105,7 @@ body {
 
 .tomtich-wrapper {
     background: url('images/catbien2.png');
-    border-radius: 20px;
+    border-radius: 35px;
     padding: 25px;
     max-width: 650px;
     width: 85%;
@@ -1113,6 +1113,64 @@ body {
     border: 3px solid rgba(139, 115, 85, 0.6);
     position: relative;
     user-select: none;
+}
+
+/* Header Bar for Phase 2 (Game phases) */
+.game-header-bar {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 60px;
+    background: linear-gradient(135deg, rgba(0, 0, 0, 0.85) 0%, rgba(20, 20, 20, 0.8) 100%);
+    backdrop-filter: blur(10px);
+    border-bottom: 3px solid #8b7355;
+    border-radius: 35px 35px 0 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 0 0 20px;
+    z-index: 10;
+    /* box-shadow: 0 3px 15px rgba(0, 0, 0, 0.8); */
+}
+
+.game-title-header {
+    font-size: 18px;
+    font-weight: bold;
+    color: #ffcc00;
+    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.9);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+}
+
+.game-close-btn-header {
+    background: rgba(0, 0, 0, 0.3);
+    backdrop-filter: blur(5px);
+    border: 3px solid #8b7355;
+    color: #8b7355;
+    font-size: 24px;
+    width: 60px;
+    height: 60px;
+    border-radius: 0 14px 0 0;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    font-weight: bold;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+    border-top: none;
+    border-right: none;
+    border-radius: 0px 35px;
+    margin: 0;
+    padding: 0;
+}
+
+.game-close-btn-header:hover {
+    background: rgba(255, 100, 100, 0.5);
+    border-color: #ff6464;
+    color: #ff6464;
+    transform: scale(1.05);
 }
 
 .tomtich-close-btn {
@@ -1159,6 +1217,7 @@ body {
     flex-direction: row;
     align-items: stretch;
     height: 650px;
+    margin-top: 60px;
     margin-bottom: 25px;
     position: relative;
     border-radius: 15px;

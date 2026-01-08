@@ -14,7 +14,14 @@
         <div v-if="tomtichVisible" id="tomtich-container">
             <!-- Main Game Wrapper - Hidden during tunnel phase -->
             <div v-if="gamePhase !== 'TUNNEL_NAV'" class="tomtich-wrapper">
-                <button @click="handleTomTichClose" class="tomtich-close-btn">✖</button>
+                <!-- Header Bar for Phase 2 -->
+                <div v-if="gamePhase !== 'IDLE'" class="game-header-bar">
+                    <div class="game-title-header">🦞 CÂU TÔM TÍCH - GIAI ĐOẠN 2</div>
+                    <button @click="handleTomTichClose" class="game-close-btn-header">✖</button>
+                </div>
+                
+                <!-- Close button for IDLE phase only -->
+                <button v-if="gamePhase === 'IDLE'" @click="handleTomTichClose" class="tomtich-close-btn">✖</button>
 
                 <!-- Phase 1: Start Prompt -->
                 <div v-if="gamePhase === 'IDLE'" class="start-prompt">
