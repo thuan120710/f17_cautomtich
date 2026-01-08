@@ -52,7 +52,7 @@ AddEventHandler('cautomtich:notification', function(item, reason)
         tomtich_fail = "😔 Thất bại! Bạn nhận được Rác thải nhựa"
     }
     
-    local message = messages[reason] or "Bạn đã nhận được phần thưởng!"
+    local message = messages[reason] or reason or "Bạn đã nhận được phần thưởng!"
     
     -- Hiển thị notification theo system
     if NOTIFICATION_TYPE == "ESX" then
@@ -163,7 +163,7 @@ end)
 
 -- Callback từ NUI
 RegisterNUICallback('tomtichAttempt', function(data, cb)
-    TriggerServerEvent('tomtich:attempt', data.success, data.item)
+    TriggerServerEvent('tomtich:attempt', data.success, data.item, data.customMessage)
     cb('ok')
 end)
 

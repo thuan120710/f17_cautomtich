@@ -61,7 +61,7 @@ AddEventHandler('tomtich:startGame', function()
 end)
 
 RegisterNetEvent('tomtich:attempt')
-AddEventHandler('tomtich:attempt', function(success, itemCode)
+AddEventHandler('tomtich:attempt', function(success, itemCode, customMessage)
     local src = source
     local game = activeTomTichGames[src]
     
