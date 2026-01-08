@@ -20,7 +20,7 @@
                 <div v-if="gamePhase === 'IDLE'" class="start-prompt">
                     <div class="game-title">🦞 CÂU TÔM TÍCH</div>
                     <div v-if="!tunnelCompleted" class="phase-badge">GIAI ĐOẠN 1</div>
-                    <div v-else class="phase-badge phase-2">GIAI ĐOẠN 2</div>
+                    <div v-else class="phase-badge-2">GIAI ĐOẠN 2</div>
                     <div v-if="!tunnelCompleted" class="game-instructions">
                         <div class="instruction-step">
                             <span class="step-number">1</span>
@@ -35,12 +35,12 @@
                             <span class="step-text">Giữ lực căng để câu tôm</span>
                         </div>
                     </div>
-                    <div v-else class="tunnel-completed-info">
-                        <div class="completed-icon">✅</div>
-                        <div class="completed-text">Đã qua hang thành công!</div>
-                        <div class="next-step">Tiếp theo: Thả dây câu xuống đáy</div>
+                    <div v-else class="tunnel-completed-box">
+                        <div class="completed-checkmark">✓</div>
+                        <div class="completed-text-main">Đã qua hang thành công!</div>
+                        <div class="next-step-text">Tiếp theo: Thả dây câu xuống đáy</div>
                     </div>
-                    <div class="start-button">{{ tunnelCompleted ? 'NHẤN SPACE ĐỂ THẢ CÂU' : 'NHẤN SPACE ĐỂ BẮT ĐẦU' }}</div>
+                    <div class="start-button">{{ tunnelCompleted ? 'NHẤN SPACE ĐỂ BẮT ĐẦU' : 'NHẤN SPACE ĐỂ BẮT ĐẦU' }}</div>
                 </div>
 
                 <!-- Phase 2: Dropping Line -->
@@ -194,50 +194,69 @@
                                 <span class="progress-shine"></span>
                             </div>
                         </div>
-
-                        <div class="control-guide">
-                            <div class="control-row">
-                                <div class="control-key">
-                                    <kbd>GIỮ SPACE</kbd>
-                                    <span class="control-arrow">→</span>
-                                    <span class="control-action">Kéo dây lên (Tăng lực)</span>
-                                </div>
-                            </div>
-                            <div class="control-row">
-                                <div class="control-key">
-                                    <kbd>NHẢ SPACE</kbd>
-                                    <span class="control-arrow">→</span>
-                                    <span class="control-action">Thả lỏng (Giảm lực)</span>
-                                </div>
-                            </div>
-                            <div class="control-tip">
-                                <span class="tip-icon">💡</span>
-                                <span class="tip-text">Giữ lực trong vùng AN TOÀN để câu thành công!</span>
-                            </div>
-                        </div>
                     </div>
                 </div>
 
             </div>
             <!-- End of tomtich-wrapper -->
 
+            <!-- Fishing Instructions Panel - Separate (Outside game container) -->
+            <div v-if="gamePhase === 'FISHING'" class="fishing-instruction-panel-outside">
+                <div class="instruction-header">
+                    <span class="header-icon">🎣</span>
+                    <h2>HƯỚNG DẪN CÂU TÔM</h2>
+                </div>
+                <div class="instruction-content">
+                    <div class="control-item">
+                        <div class="control-icon">⬆️</div>
+                        <div class="control-desc">
+                            <strong>Giữ SPACE</strong>
+                            <span>Kéo dây lên (Tăng lực)</span>
+                        </div>
+                    </div>
+                    <div class="control-item">
+                        <div class="control-icon">⬇️</div>
+                        <div class="control-desc">
+                            <strong>Nhả SPACE</strong>
+                            <span>Thả lỏng (Giảm lực)</span>
+                        </div>
+                    </div>
+                    <div class="instruction-guide-text">
+                        <div class="guide-icon">💡</div>
+                        <div class="guide-text">Giữ lực trong vùng AN TOÀN để câu thành công!</div>
+                    </div>
+                </div>
+            </div>
+
             <!-- Phase 1.5: Tunnel Navigation (Full Screen Overlay) -->
             <div v-if="gamePhase === 'TUNNEL_NAV'" id="tunnel-game-container">
-                <!-- Close button for tunnel -->
-                <button @click="handleTomTichClose" class="tunnel-close-btn">✖</button>
+                <!-- Header Bar with Title and Close Button -->
+                <div class="tunnel-header-bar">
+                    <div class="tunnel-title">GIAI ĐOẠN 1: ĐI QUA HANG</div>
+                    <button @click="handleTomTichClose" class="tunnel-close-btn-header">✖</button>
+                </div>
                 
                 <canvas id="tunnelCanvas" ref="tunnelCanvas"></canvas>
 
-                <!-- Tunnel Progress Bar - Right Side (giữ nguyên) -->
-                <div class="tunnel-progress-container">
-                    <div class="tunnel-progress-label">ĐỘ SÂU</div>
-                    <div class="tunnel-progress-fill" :style="{ height: tunnelProgress + '%' }"></div>
-                    <div class="tunnel-depth-text">{{ Math.round(tunnelProgress) }}%</div>
-                </div>
-
-                <!-- Bottom Info Panel - 2 rows -->
+                <!-- Bottom Info Panel - 3 rows -->
                 <div class="tunnel-bottom-panel">
-                    <!-- Row 1: Speed & Combo -->
+                    <!-- Row 1: Status Message (moved to top) -->
+                    <div class="message-row">
+                        <!-- Collision Warning -->
+                        <div v-if="tunnelCollisionWarning" class="tunnel-status-message warning">
+                            <div class="status-icon">⚠️</div>
+                            <div class="status-text">GẦN TƯỜNG!</div>
+                        </div>
+
+                        <!-- Main Message (Auto-hide after 1s) -->
+                        <div v-else-if="tunnelMessage" class="tunnel-status-message" 
+                             :class="{ 'success': tunnelMessage.includes('✅'), 'error': !tunnelMessage.includes('✅') }">
+                            <div class="status-icon">{{ tunnelMessage.includes('✅') ? '✅' : '⚠️' }}</div>
+                            <div class="status-text">{{ tunnelMessage.replace('✅', '').trim() }}</div>
+                        </div>
+                    </div>
+
+                    <!-- Row 2: Speed & Combo -->
                     <div class="info-row">
                         <!-- Speed Indicator -->
                         <div class="tunnel-speed-indicator">
@@ -261,20 +280,13 @@
                         </div>
                     </div>
 
-                    <!-- Row 2: Status Message -->
-                    <div class="message-row">
-                        <!-- Collision Warning -->
-                        <div v-if="tunnelCollisionWarning" class="tunnel-status-message warning">
-                            <div class="status-icon">⚠️</div>
-                            <div class="status-text">GẦN TƯỜNG!</div>
+                    <!-- Row 3: Horizontal Progress Bar -->
+                    <div class="tunnel-progress-horizontal">
+                        <div class="progress-label-left">ĐỘ SÂU</div>
+                        <div class="progress-bar-horizontal">
+                            <div class="progress-fill-horizontal" :style="{ width: tunnelProgress + '%' }"></div>
                         </div>
-
-                        <!-- Main Message (Auto-hide after 1s) -->
-                        <div v-else-if="tunnelMessage" class="tunnel-status-message" 
-                             :class="{ 'success': tunnelMessage.includes('✅'), 'error': !tunnelMessage.includes('✅') }">
-                            <div class="status-icon">{{ tunnelMessage.includes('✅') ? '✅' : '⚠️' }}</div>
-                            <div class="status-text">{{ tunnelMessage.replace('✅', '').trim() }}</div>
-                        </div>
+                        <div class="progress-value-right">{{ Math.round(tunnelProgress) }}%</div>
                     </div>
                 </div>
             </div>
