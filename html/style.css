@@ -1535,7 +1535,7 @@ body {
     left: 50%;
     transform: translateX(-50%);
     transition: top 0.2s ease-out;
-    z-index: 6;
+    z-index: 5;
 }
 
 .shrimp-icon {
@@ -1545,8 +1545,8 @@ body {
 }
 
 .shrimp-icon-img {
-    width: 60px;
-    height: 60px;
+    width: 90px;
+    height: 90px;
     object-fit: contain;
     animation: shrimpWiggle 1.5s ease-in-out infinite;
     filter: drop-shadow(0 0 15px rgba(255, 100, 50, 0.8));
