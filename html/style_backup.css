@@ -22,19 +22,20 @@ body {
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
-    width: 26.25rem;
-    height: 43.75rem;
+    width: 420px;
+    height: 700px;
+    /* Ngắn lại bớt */
     z-index: 10000;
     display: flex;
     flex-direction: column;
     justify-content: center;
     align-items: center;
     background: #1a1510;
-    border-radius: 2.188rem;
+    border-radius: 35px;
     overflow: hidden;
     cursor: none;
-    border: 0.313rem solid #8b7355;
-    box-shadow: 0 0 3.125rem rgba(0, 0, 0, 0.9);
+    border: 5px solid #8b7355;
+    box-shadow: 0 0 50px rgba(0, 0, 0, 0.9);
 }
 
 /* Header Bar - Like in image */
@@ -43,34 +44,34 @@ body {
     top: 0;
     left: 0;
     right: 0;
-    height: 3.75rem;
+    height: 60px;
     background: linear-gradient(135deg, rgba(0, 0, 0, 0.95) 0%, rgba(20, 20, 20, 0.9) 100%);
-    border-bottom: 0.188rem solid #8b7355;
+    border-bottom: 3px solid #8b7355;
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 0 0 0 1.25rem;
+    padding: 0 0 0 20px;
     z-index: 10001;
-    box-shadow: 0 0.188rem 0.938rem rgba(0, 0, 0, 0.8);
+    box-shadow: 0 3px 15px rgba(0, 0, 0, 0.8);
 }
 
 .tunnel-title {
-    font-size: 1.25rem;
+    font-size: 20px;
     font-weight: bold;
     color: #ffcc00;
-    text-shadow: 0.125rem 0.125rem 0.25rem rgba(0, 0, 0, 0.9);
-    letter-spacing: 0.125rem;
+    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.9);
+    letter-spacing: 2px;
     text-transform: uppercase;
 }
 
 .tunnel-close-btn-header {
     background: transparent;
-    border: 0.188rem solid #8b7355;
+    border: 3px solid #8b7355;
     color: #8b7355;
-    font-size: 1.5rem;
-    width: 3.75rem;
-    height: 3.75rem;
-    border-radius: 0 2.188rem;
+    font-size: 24px;
+    width: 60px;
+    height: 60px;
+    border-radius: 0 35px;
     cursor: pointer;
     transition: all 0.3s ease;
     font-weight: bold;
@@ -101,118 +102,140 @@ body {
 .tunnel-instruction-panel-outside {
     position: fixed;
     top: 50%;
-    left: calc(50% + 26.25rem / 2 + 0.938rem);
+    left: calc(50% + 420px / 2 + 15px);
     transform: translateY(-50%);
     color: white;
     pointer-events: none;
     z-index: 10002;
-    width: 18.875rem;
+    width: 302px;
     background: linear-gradient(135deg, rgba(0, 0, 0, 0.95) 0%, rgba(20, 20, 20, 0.9) 100%);
-    padding: 1.25rem;
-    border-radius: 0.938rem;
-    border: 0.188rem solid #8B7355;
-    box-shadow: 0 0.625rem 3.125rem rgba(0, 0, 0, 0.9);
+    padding: 20px;
+    border-radius: 15px;
+    border: 3px solid #8B7355;
+    box-shadow: 0 10px 50px rgba(0, 0, 0, 0.9);
 }
 
 .tunnel-instruction-panel-outside .instruction-header {
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 0.625rem;
-    margin-bottom: 0.938rem;
-    padding-bottom: 0.625rem;
-    border-bottom: 0.125rem solid rgba(255, 204, 0, 0.3);
+    gap: 10px;
+    margin-bottom: 15px;
+    padding-bottom: 10px;
+    border-bottom: 2px solid rgba(255, 204, 0, 0.3);
 }
 
 .tunnel-instruction-panel-outside .header-icon {
-    font-size: 1.5rem;
+    font-size: 24px;
     animation: bounce 1s ease-in-out infinite;
 }
 
 .tunnel-instruction-panel-outside .instruction-header h2 {
-    font-size: 0.938rem;
+    font-size: 15px;
     margin: 0;
     color: #ffcc00;
-    text-shadow: 0.125rem 0.125rem 0.25rem rgba(0, 0, 0, 0.8);
+    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
+}
+
+.instruction-header {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    margin-bottom: 15px;
+    padding-bottom: 10px;
+    border-bottom: 2px solid rgba(255, 204, 0, 0.3);
+}
+
+.header-icon {
+    font-size: 20px;
+    animation: bounce 1s ease-in-out infinite;
+}
+
+.instruction-header h2 {
+    font-size: 14px;
+    margin: 0;
+    color: #ffcc00;
+    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
 }
 
 .tunnel-instruction-panel-outside .instruction-content {
     display: flex;
     flex-direction: column;
-    gap: 0.75rem;
+    gap: 12px;
 }
 
 .tunnel-instruction-panel-outside .control-item {
     display: flex;
     align-items: center;
-    gap: 0.625rem;
+    gap: 10px;
     background: rgba(255, 255, 255, 0.05);
-    padding: 0.625rem;
-    border-radius: 0.5rem;
-    border-left: 0.188rem solid #4CAF50;
+    padding: 10px;
+    border-radius: 8px;
+    border-left: 3px solid #4CAF50;
 }
 
 .tunnel-instruction-panel-outside .control-icon {
-    font-size: 1.375rem;
-    min-width: 1.75rem;
+    font-size: 22px;
+    min-width: 28px;
     text-align: center;
 }
 
 .tunnel-instruction-panel-outside .control-desc {
     display: flex;
     flex-direction: column;
-    gap: 0.188rem;
+    gap: 3px;
 }
 
 .tunnel-instruction-panel-outside .control-desc strong {
     color: #ffcc00;
-    font-size: 0.813rem;
+    font-size: 13px;
 }
 
 .tunnel-instruction-panel-outside .control-desc span {
     color: #ccc;
-    font-size: 0.688rem;
+    font-size: 11px;
 }
 
 .tunnel-instruction-panel-outside .warning-box {
     background: rgba(255, 50, 50, 0.2);
-    border: 0.125rem solid rgba(255, 50, 50, 0.5);
-    padding: 0.5rem 0.75rem;
-    border-radius: 0.5rem;
+    border: 2px solid rgba(255, 50, 50, 0.5);
+    padding: 8px 12px;
+    border-radius: 8px;
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 0.5rem;
-    font-size: 0.688rem;
+    gap: 8px;
+    font-size: 11px;
     font-weight: bold;
     color: #ff5252;
-    margin-top: 0.313rem;
+    margin-top: 5px;
 }
 
 .tunnel-instruction-panel-outside .warning-icon {
-    font-size: 1rem;
+    font-size: 16px;
     animation: pulse 1s ease-in-out infinite;
 }
 
 .tunnel-instruction-panel-outside .instruction-guide-text {
     background: rgba(33, 150, 243, 0.2);
-    border: 0.125rem solid rgba(33, 150, 243, 0.5);
-    padding: 0.625rem 0.75rem;
-    border-radius: 0.5rem;
+    border: 2px solid rgba(33, 150, 243, 0.5);
+    padding: 10px 12px;
+    border-radius: 8px;
     display: flex;
     align-items: center;
-    gap: 0.625rem;
-    margin-top: 0.625rem;
+    gap: 10px;
+    margin-top: 10px;
 }
 
 .tunnel-instruction-panel-outside .guide-icon {
-    font-size: 1.25rem;
+    font-size: 20px;
     flex-shrink: 0;
 }
 
 .tunnel-instruction-panel-outside .guide-text {
     color: #64B5F6;
-    font-size: 0.688rem;
+    font-size: 11px;
     font-weight: 600;
     line-height: 1.4;
 }
@@ -221,105 +244,105 @@ body {
 .fishing-instruction-panel-outside {
     position: fixed;
     top: 50%;
-    left: calc(50% + 40.625rem / 2 + 0.938rem);
+    left: calc(50% + 650px / 2 + 15px);
     transform: translateY(-50%);
     color: white;
     pointer-events: none;
     z-index: 10002;
-    width: 18.875rem;
+    width: 302px;
     background: linear-gradient(135deg, rgba(0, 0, 0, 0.95) 0%, rgba(20, 20, 20, 0.9) 100%);
-    padding: 1.25rem;
-    border-radius: 0.938rem;
-    border: 0.188rem solid #8B7355;
-    box-shadow: 0 0.625rem 3.125rem rgba(0, 0, 0, 0.9);
+    padding: 20px;
+    border-radius: 15px;
+    border: 3px solid #8B7355;
+    box-shadow: 0 10px 50px rgba(0, 0, 0, 0.9);
 }
 
 .fishing-instruction-panel-outside .instruction-header {
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 0.625rem;
-    margin-bottom: 0.938rem;
-    padding-bottom: 0.625rem;
-    border-bottom: 0.125rem solid rgba(76, 175, 80, 0.3);
+    gap: 10px;
+    margin-bottom: 15px;
+    padding-bottom: 10px;
+    border-bottom: 2px solid rgba(76, 175, 80, 0.3);
 }
 
 .fishing-instruction-panel-outside .header-icon {
-    font-size: 1.5rem;
+    font-size: 24px;
     animation: bounce 1s ease-in-out infinite;
 }
 
 .fishing-instruction-panel-outside .instruction-header h2 {
-    font-size: 0.938rem;
+    font-size: 15px;
     margin: 0;
     color: #4CAF50;
-    text-shadow: 0.125rem 0.125rem 0.25rem rgba(0, 0, 0, 0.8);
+    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
 }
 
 .fishing-instruction-panel-outside .instruction-content {
     display: flex;
     flex-direction: column;
-    gap: 0.75rem;
+    gap: 12px;
 }
 
 .fishing-instruction-panel-outside .control-item {
     display: flex;
     align-items: center;
-    gap: 0.625rem;
+    gap: 10px;
     background: rgba(255, 255, 255, 0.05);
-    padding: 0.625rem;
-    border-radius: 0.5rem;
-    border-left: 0.188rem solid #4CAF50;
+    padding: 10px;
+    border-radius: 8px;
+    border-left: 3px solid #4CAF50;
 }
 
 .fishing-instruction-panel-outside .control-icon {
-    font-size: 1.375rem;
-    min-width: 1.75rem;
+    font-size: 22px;
+    min-width: 28px;
     text-align: center;
 }
 
 .fishing-instruction-panel-outside .control-desc {
     display: flex;
     flex-direction: column;
-    gap: 0.188rem;
+    gap: 3px;
 }
 
 .fishing-instruction-panel-outside .control-desc strong {
     color: #4CAF50;
-    font-size: 0.813rem;
+    font-size: 13px;
 }
 
 .fishing-instruction-panel-outside .control-desc span {
     color: #ccc;
-    font-size: 0.688rem;
+    font-size: 11px;
 }
 
 .fishing-instruction-panel-outside .instruction-guide-text {
     background: rgba(255, 204, 0, 0.2);
-    border: 0.125rem solid rgba(255, 204, 0, 0.5);
-    padding: 0.625rem 0.75rem;
-    border-radius: 0.5rem;
+    border: 2px solid rgba(255, 204, 0, 0.5);
+    padding: 10px 12px;
+    border-radius: 8px;
     display: flex;
     align-items: center;
-    gap: 0.625rem;
-    margin-top: 0.625rem;
+    gap: 10px;
+    margin-top: 10px;
 }
 
 .fishing-instruction-panel-outside .guide-icon {
-    font-size: 1.25rem;
+    font-size: 20px;
     flex-shrink: 0;
 }
 
 .fishing-instruction-panel-outside .guide-text {
     color: #ffcc00;
-    font-size: 0.688rem;
+    font-size: 11px;
     font-weight: 600;
     line-height: 1.4;
 }
 
 @keyframes bounce {
     0%, 100% { transform: translateY(0); }
-    50% { transform: translateY(-0.313rem); }
+    50% { transform: translateY(-5px); }
 }
 
 /* ============================================
@@ -1082,12 +1105,12 @@ body {
 
 .tomtich-wrapper {
     background: url('images/catbien2.png');
-    border-radius: 2.188rem;
-    padding: 1.563rem;
-    max-width: 40.625rem;
+    border-radius: 35px;
+    padding: 25px;
+    max-width: 650px;
     width: 85%;
-    box-shadow: 0 1.25rem 3.75rem rgba(0, 0, 0, 0.5);
-    border: 0.188rem solid rgba(139, 115, 85, 0.6);
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+    border: 3px solid rgba(139, 115, 85, 0.6);
     position: relative;
     user-select: none;
 }
@@ -1098,36 +1121,37 @@ body {
     top: 0;
     left: 0;
     right: 0;
-    height: 3.75rem;
+    height: 60px;
     background: linear-gradient(135deg, rgba(0, 0, 0, 0.85) 0%, rgba(20, 20, 20, 0.8) 100%);
-    backdrop-filter: blur(0.625rem);
-    border-bottom: 0.188rem solid #8b7355;
-    border-radius: 2.188rem 0 0 0;
+    backdrop-filter: blur(10px);
+    border-bottom: 3px solid #8b7355;
+    border-radius: 35px 35px 0 0;
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 0 0 0 1.25rem;
+    padding: 0 0 0 20px;
     z-index: 10;
+    /* box-shadow: 0 3px 15px rgba(0, 0, 0, 0.8); */
 }
 
 .game-title-header {
-    font-size: 1.125rem;
+    font-size: 18px;
     font-weight: bold;
     color: #ffcc00;
-    text-shadow: 0.125rem 0.125rem 0.25rem rgba(0, 0, 0, 0.9);
-    letter-spacing: 0.125rem;
+    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.9);
+    letter-spacing: 2px;
     text-transform: uppercase;
 }
 
 .game-close-btn-header {
-    background: linear-gradient(135deg, rgba(0, 0, 0, 0.85) 0%, rgba(20, 20, 20, 0.8) 100%);
-    backdrop-filter: blur(0.313rem);
-    border: 0.188rem solid #8b7355;
+    background: rgba(0, 0, 0, 0.3);
+    backdrop-filter: blur(5px);
+    border: 3px solid #8b7355;
     color: #8b7355;
-    font-size: 1.5rem;
-    width: 3.75rem;
-    height: 3.75rem;
-    border-radius: 0 2.188rem;
+    font-size: 24px;
+    width: 60px;
+    height: 60px;
+    border-radius: 0 14px 0 0;
     cursor: pointer;
     transition: all 0.3s ease;
     font-weight: bold;
@@ -1137,6 +1161,7 @@ body {
     line-height: 1;
     border-top: none;
     border-right: none;
+    border-radius: 0px 35px;
     margin: 0;
     padding: 0;
 }
