@@ -49,16 +49,33 @@ const app = createApp({
         const tunnelCombo = ref(0); // Combo for staying in center
 
 
-        // Game Configuration
-        const SHRIMP_TYPES = [
-            { id: 'tomtich', name: 'Tôm Tích', image: 'images/tomtich.png', chance: 50 },
-            { id: 'tomtichxanh', name: 'Tôm Tích Xanh', image: 'images/tomtich_xanh.png', chance: 30 },
-            { id: 'tomtichdo', name: 'Tôm Tích Đỏ', image: 'images/tomtich_do.png', chance: 15 },
-            { id: 'tomtichhoangkim', name: 'Tôm Tích Hoàng Kim', image: 'images/tomtich_vang.png', chance: 5 }
-        ];
+        // Game Configuration - Level System
+        const SHRIMP_TYPES_BY_LEVEL = {
+            1: [
+                { id: 'tomtich', name: 'Tôm Tích', image: 'images/tomtich.png', chance: 60 },
+                { id: 'tomtichxanh', name: 'Tôm Tích Xanh', image: 'images/tomtich_xanh.png', chance: 35 },
+                { id: 'tomtichdo', name: 'Tôm Tích Đỏ', image: 'images/tomtich_do.png', chance: 5 },
+                { id: 'tomtichhoangkim', name: 'Tôm Tích Hoàng Kim', image: 'images/tomtich_vang.png', chance: 0 }
+            ],
+            2: [
+                { id: 'tomtich', name: 'Tôm Tích', image: 'images/tomtich.png', chance: 45 },
+                { id: 'tomtichxanh', name: 'Tôm Tích Xanh', image: 'images/tomtich_xanh.png', chance: 40 },
+                { id: 'tomtichdo', name: 'Tôm Tích Đỏ', image: 'images/tomtich_do.png', chance: 10 },
+                { id: 'tomtichhoangkim', name: 'Tôm Tích Hoàng Kim', image: 'images/tomtich_vang.png', chance: 5 }
+            ],
+            3: [
+                { id: 'tomtich', name: 'Tôm Tích', image: 'images/tomtich.png', chance: 40 },
+                { id: 'tomtichxanh', name: 'Tôm Tích Xanh', image: 'images/tomtich_xanh.png', chance: 30 },
+                { id: 'tomtichdo', name: 'Tôm Tích Đỏ', image: 'images/tomtich_do.png', chance: 15 },
+                { id: 'tomtichhoangkim', name: 'Tôm Tích Hoàng Kim', image: 'images/tomtich_vang.png', chance: 15 }
+            ]
+        };
+
+        // Player level (will be received from server)
+        const playerLevel = ref(1);
 
         // Game State
-        const currentShrimp = ref(SHRIMP_TYPES[0]);
+        const currentShrimp = ref(SHRIMP_TYPES_BY_LEVEL[1][0]);
         const currentShrimpImage = ref('images/tomtich.png');
 
         // Tension system
@@ -790,12 +807,15 @@ const app = createApp({
                 SOUNDS.reelIn.currentTime = 0;
             }
 
-            // Random shrimp selection
+            // Random shrimp selection based on player level
+            const currentLevel = playerLevel.value;
+            const shrimpTypes = SHRIMP_TYPES_BY_LEVEL[currentLevel] || SHRIMP_TYPES_BY_LEVEL[1];
+            
             const rand = Math.random() * 100; // 0-100
             let cumulative = 0;
-            let selected = SHRIMP_TYPES[0];
+            let selected = shrimpTypes[0];
 
-            for (const type of SHRIMP_TYPES) {
+            for (const type of shrimpTypes) {
                 cumulative += type.chance;
                 if (rand <= cumulative) {
                     selected = type;
@@ -805,11 +825,10 @@ const app = createApp({
             currentShrimp.value = selected;
             currentShrimpImage.value = selected.image;
 
-            // Difficulty adjustment based on rarity?
-            // Rare shrimps could be harder
+            // Difficulty adjustment based on rarity
             let difficultyMult = 1.0;
-            if (selected.id === 'tomtich_hoangkim') difficultyMult = 1.3;
-            else if (selected.id === 'tomtich_do') difficultyMult = 1.1;
+            if (selected.id === 'tomtichhoangkim') difficultyMult = 1.3;
+            else if (selected.id === 'tomtichdo') difficultyMult = 1.1;
 
             shrimpResistance.value = (0.4 + Math.random() * 0.4) * difficultyMult;
 
@@ -941,8 +960,17 @@ const app = createApp({
                 resetGameState();
                 gamePhase.value = 'IDLE';
                 tomtichVisible.value = true;
+                // Receive player level from server
+                if (event.data.level) {
+                    playerLevel.value = Math.min(3, Math.max(1, event.data.level));
+                }
             } else if (event.data.action === 'hideTomTich') {
                 closeGameUI();
+            } else if (event.data.action === 'updateLevel') {
+                // Update level from server
+                if (event.data.level) {
+                    playerLevel.value = Math.min(3, Math.max(1, event.data.level));
+                }
             }
         };
 
@@ -1012,6 +1040,7 @@ const app = createApp({
             shrimpPosition,
             shrimpPulling,
             currentShrimpImage,
+            playerLevel,
             handleTomTichClose,
             startTomTichGame: () => { /* No-op, auto start via space */ }
         };

@@ -71,6 +71,16 @@ AddEventHandler('cautomtich:notification', function(item, reason)
     end
 end)
 
+-- Nhận cập nhật level từ server
+RegisterNetEvent('tomtich:updateLevel')
+AddEventHandler('tomtich:updateLevel', function(level, exp)
+    SendNUIMessage({
+        action = "updateLevel",
+        level = level,
+        exp = exp
+    })
+end)
+
 -- Callback từ NUI
 RegisterNUICallback('closeTomTich', function(data, cb)
     CloseTomTichGame()

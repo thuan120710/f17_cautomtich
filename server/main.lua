@@ -18,11 +18,107 @@ end
 
 local ITEMS = {
     TRASH = "racthainhua",
-    COMMON = "tomtich",         -- Tôm tích thường (50%)
-    UNCOMMON = "tomtichxanh",  -- Tôm tích xanh (30%)
-    RARE = "tomtichdo",        -- Tôm tích đỏ (15%)
-    LEGENDARY = "tomtichhoangkim" -- Tôm tích hoàng kim (5%)
+    COMMON = "tomtich",         -- Tôm tích thường
+    UNCOMMON = "tomtichxanh",  -- Tôm tích xanh
+    RARE = "tomtichdo",        -- Tôm tích đỏ
+    LEGENDARY = "tomtichhoangkim" -- Tôm tích hoàng kim
 }
+
+-- Hệ thống Level
+local playerLevels = {} -- {[playerId] = level}
+local playerExperience = {} -- {[playerId] = exp}
+
+-- Cấu hình Level
+local LEVEL_CONFIG = {
+    [1] = {
+        expRequired = 0,
+        rates = {
+            [ITEMS.COMMON] = 60,
+            [ITEMS.UNCOMMON] = 35,
+            [ITEMS.RARE] = 5,
+            [ITEMS.LEGENDARY] = 0
+        }
+    },
+    [2] = {
+        expRequired = 100, -- Cần 100 exp để lên level 2
+        rates = {
+            [ITEMS.COMMON] = 45,
+            [ITEMS.UNCOMMON] = 40,
+            [ITEMS.RARE] = 10,
+            [ITEMS.LEGENDARY] = 5
+        }
+    },
+    [3] = {
+        expRequired = 300, -- Cần 300 exp để lên level 3
+        rates = {
+            [ITEMS.COMMON] = 40,
+            [ITEMS.UNCOMMON] = 30,
+            [ITEMS.RARE] = 15,
+            [ITEMS.LEGENDARY] = 15
+        }
+    }
+}
+
+-- Exp nhận được khi câu tôm
+local EXP_REWARDS = {
+    [ITEMS.COMMON] = 5,
+    [ITEMS.UNCOMMON] = 10,
+    [ITEMS.RARE] = 20,
+    [ITEMS.LEGENDARY] = 50
+}
+
+-- Hàm lấy level của người chơi
+local function GetPlayerLevel(playerId)
+    if not playerLevels[playerId] then
+        playerLevels[playerId] = 1
+        playerExperience[playerId] = 0
+    end
+    return playerLevels[playerId]
+end
+
+-- Hàm lấy exp của người chơi
+local function GetPlayerExp(playerId)
+    if not playerExperience[playerId] then
+        playerExperience[playerId] = 0
+    end
+    return playerExperience[playerId]
+end
+
+-- Hàm thêm exp và kiểm tra level up
+local function AddExperience(playerId, exp)
+    local currentExp = GetPlayerExp(playerId)
+    local currentLevel = GetPlayerLevel(playerId)
+    
+    currentExp = currentExp + exp
+    playerExperience[playerId] = currentExp
+    
+    -- Kiểm tra level up
+    local nextLevel = currentLevel + 1
+    if LEVEL_CONFIG[nextLevel] and currentExp >= LEVEL_CONFIG[nextLevel].expRequired then
+        playerLevels[playerId] = nextLevel
+        TriggerClientEvent('cautomtich:notification', playerId, nil, 
+            string.format("🎉 LEVEL UP! Bạn đã đạt Level %d!", nextLevel))
+        return true, nextLevel
+    end
+    
+    return false, currentLevel
+end
+
+-- Hàm random tôm theo level
+local function GetRandomShrimpByLevel(level)
+    local rates = LEVEL_CONFIG[level].rates
+    local rand = math.random(1, 100)
+    local cumulative = 0
+    
+    for item, chance in pairs(rates) do
+        cumulative = cumulative + chance
+        if rand <= cumulative then
+            return item
+        end
+    end
+    
+    return ITEMS.COMMON -- Fallback
+end
 
 -- Helper function to give reward
 function GiveReward(playerId, item, reason)
@@ -55,9 +151,16 @@ local activeTomTichGames = {}
 RegisterNetEvent('tomtich:startGame')
 AddEventHandler('tomtich:startGame', function()
     local src = source
+    local level = GetPlayerLevel(src)
+    local exp = GetPlayerExp(src)
+    
     activeTomTichGames[src] = {
-        active = true
+        active = true,
+        level = level
     }
+    
+    -- Gửi thông tin level về client
+    TriggerClientEvent('tomtich:updateLevel', src, level, exp)
 end)
 
 RegisterNetEvent('tomtich:attempt')
@@ -84,6 +187,23 @@ AddEventHandler('tomtich:attempt', function(success, itemCode, customMessage)
 
     local item = success and rewardItem or ITEMS.TRASH
     local reason = success and "tomtich_success" or "tomtich_fail"
+    
+    -- Thêm EXP nếu thành công
+    if success and rewardItem ~= ITEMS.TRASH then
+        local expGained = EXP_REWARDS[rewardItem] or 0
+        local leveledUp, newLevel = AddExperience(src, expGained)
+        
+        if leveledUp then
+            -- Thông báo level up
+            TriggerClientEvent('cautomtich:notification', src, nil, 
+                string.format("🎉 LEVEL UP! Bạn đã đạt Level %d!", newLevel))
+        end
+        
+        -- Cập nhật level mới về client
+        local currentExp = GetPlayerExp(src)
+        local currentLevel = GetPlayerLevel(src)
+        TriggerClientEvent('tomtich:updateLevel', src, currentLevel, currentExp)
+    end
     
     -- Thêm item vào inventory
     if INVENTORY_TYPE == "ESX" then

@@ -1928,3 +1928,31 @@ body {
     font-weight: 600;
     text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);
 }
+/*
+ Player Level Badge */
+.player-level-badge {
+    display: inline-block;
+    background: linear-gradient(135deg, #FF6B6B 0%, #FF8E53 100%);
+    color: white;
+    padding: 8px 25px;
+    border-radius: 20px;
+    font-size: 16px;
+    font-weight: bold;
+    margin: 10px 0 15px 0;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    box-shadow: 0 4px 15px rgba(255, 107, 107, 0.4);
+    animation: levelBadgePulse 2s ease-in-out infinite;
+}
+
+@keyframes levelBadgePulse {
+    0%, 100% { 
+        transform: scale(1); 
+        box-shadow: 0 4px 15px rgba(255, 107, 107, 0.4); 
+    }
+    50% { 
+        transform: scale(1.05); 
+        box-shadow: 0 6px 20px rgba(255, 107, 107, 0.6); 
+    }
+}

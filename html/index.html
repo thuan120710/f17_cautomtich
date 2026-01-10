@@ -26,6 +26,7 @@
                 <!-- Phase 1: Start Prompt -->
                 <div v-if="gamePhase === 'IDLE'" class="start-prompt">
                     <div class="game-title">🦞 CÂU TÔM TÍCH</div>
+                    <div class="player-level-badge">LEVEL {{ playerLevel }}</div>
                     <div v-if="!tunnelCompleted" class="phase-badge">GIAI ĐOẠN 1</div>
                     <div v-else class="phase-badge-2">GIAI ĐOẠN 2</div>
                     <div v-if="!tunnelCompleted" class="game-instructions">
