@@ -152,16 +152,27 @@ end
 
 local TOMTICH_ITEM = "tomtich"
 local activeTomTichGames = {}
+local playerCooldowns = {} -- Anti-spam
 
 RegisterNetEvent('tomtich:startGame')
 AddEventHandler('tomtich:startGame', function()
     local src = source
+    
+    -- 🔒 RATE LIMITING - Chống spam
+    if playerCooldowns[src] and os.time() - playerCooldowns[src] < 10 then
+        TriggerClientEvent('cautomtich:notification', src, nil, "⏱️ Chờ 10 giây trước khi chơi lại!")
+        return
+    end
+    
+    playerCooldowns[src] = os.time()
+    
     local level = GetPlayerLevel(src)
     local exp = GetPlayerExp(src)
     
     activeTomTichGames[src] = {
         active = true,
-        level = level
+        level = level,
+        startTime = os.time() -- 🔒 Lưu thời gian bắt đầu
     }
     
     -- Gửi thông tin level về client
@@ -173,21 +184,32 @@ AddEventHandler('tomtich:attempt', function(success, itemCode, customMessage)
     local src = source
     local game = activeTomTichGames[src]
     
-    if not game or not game.active then return end
+    if not game or not game.active then 
+        print("⚠️ [ANTI-CHEAT] Player " .. src .. " gửi kết quả không hợp lệ (game không tồn tại)")
+        return 
+    end
+    
+    -- 🔒 KIỂM TRA THỜI GIAN - Chống cheat (game tối thiểu 15 giây)
+    local currentTime = os.time()
+    local gameDuration = currentTime - game.startTime
+    
+    if gameDuration < 15 then
+        print("⚠️ [ANTI-CHEAT] Player " .. src .. " hoàn thành game quá nhanh (" .. gameDuration .. "s)")
+        TriggerClientEvent('cautomtich:notification', src, nil, "⚠️ Phát hiện hành vi bất thường!")
+        activeTomTichGames[src] = nil
+        return
+    end
     
     game.active = false
     
-    -- Validate item (chống hack cơ bản, chỉ chấp nhận item trong whitelist nếu success)
+    -- 🔒 SERVER TỰ RANDOM TÔM - KHÔNG TIN CLIENT
     local rewardItem = ITEMS.TRASH
     if success then
-        -- Client gửi item code lên, server check lại hoặc tin tưởng (ở mức cơ bản)
-        -- Tốt nhất là client gửi loại (type) rồi server random, nhưng user yêu cầu logic "kéo lên thì hiện"
-        -- Tạm thời tin tưởng client gửi đúng item code từ danh sách cho phép
-        if itemCode == ITEMS.COMMON or itemCode == ITEMS.UNCOMMON or itemCode == ITEMS.RARE or itemCode == ITEMS.LEGENDARY then
-            rewardItem = itemCode
-        else
-            rewardItem = ITEMS.COMMON -- Default fallback
-        end
+        -- Server tự random dựa trên level, KHÔNG dùng itemCode từ client
+        rewardItem = GetRandomShrimpByLevel(game.level)
+        print("✅ [SERVER] Player " .. src .. " thành công - Tôm: " .. rewardItem)
+    else
+        print("❌ [SERVER] Player " .. src .. " thất bại")
     end
 
     local item = success and rewardItem or ITEMS.TRASH
@@ -227,12 +249,10 @@ AddEventHandler('tomtich:attempt', function(success, itemCode, customMessage)
         exports.ox_inventory:AddItem(src, item, 1)
     end
     
-    -- Gửi kết quả về client
+    -- Gửi kết quả về client (gửi item server đã random, không phải client gửi lên)
     TriggerClientEvent('tomtich:gameResult', src, success, item)
     
     -- Notification
-    -- Note: reusing 'caongheu:notification' event name since client logic expects it,
-    -- or we can rename it later if we want total separation, but for 100% same operation, keeping it is fine.
     TriggerClientEvent('cautomtich:notification', src, item, reason)
     
     activeTomTichGames[src] = nil
