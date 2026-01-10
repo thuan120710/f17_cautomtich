@@ -1,134 +1,182 @@
 const JavaScriptObfuscator = require('javascript-obfuscator');
+const { minify: minifyHTML } = require('html-minifier-terser');
 const fs = require('fs');
 const path = require('path');
 
-console.log('🔒 Bắt đầu obfuscate code...\n');
+(async () => {
+    console.log('🔒 Bắt đầu build & bảo vệ resource...\n');
 
-// Tạo thư mục build nếu chưa có
-const buildDir = path.join(__dirname, 'build');
-if (!fs.existsSync(buildDir)) {
-    fs.mkdirSync(buildDir);
-}
+    const buildDir = path.join(__dirname, 'build');
+    const buildHtmlDir = path.join(buildDir, 'html');
 
-// Tạo thư mục build/html
-const buildHtmlDir = path.join(buildDir, 'html');
-if (!fs.existsSync(buildHtmlDir)) {
-    fs.mkdirSync(buildHtmlDir);
-}
+    fs.mkdirSync(buildDir, { recursive: true });
+    fs.mkdirSync(buildHtmlDir, { recursive: true });
 
-// Copy server và client (không cần obfuscate Lua)
-console.log('📁 Copy server và client files...');
-const copyDir = (src, dest) => {
-    if (!fs.existsSync(dest)) {
-        fs.mkdirSync(dest, { recursive: true });
-    }
-    const entries = fs.readdirSync(src, { withFileTypes: true });
-    for (let entry of entries) {
-        const srcPath = path.join(src, entry.name);
-        const destPath = path.join(dest, entry.name);
-        if (entry.isDirectory()) {
-            copyDir(srcPath, destPath);
-        } else {
-            fs.copyFileSync(srcPath, destPath);
+    // Copy server & client
+    console.log('📁 Copy server & client...');
+    const copyDir = (src, dest) => {
+        if (!fs.existsSync(dest)) fs.mkdirSync(dest, { recursive: true });
+        const entries = fs.readdirSync(src, { withFileTypes: true });
+        for (const entry of entries) {
+            const srcPath = path.join(src, entry.name);
+            const destPath = path.join(dest, entry.name);
+            if (entry.isDirectory()) {
+                copyDir(srcPath, destPath);
+            } else {
+                fs.copyFileSync(srcPath, destPath);
+            }
         }
-    }
-};
+    };
 
-copyDir(path.join(__dirname, 'server'), path.join(buildDir, 'server'));
-copyDir(path.join(__dirname, 'client'), path.join(buildDir, 'client'));
+    copyDir(path.join(__dirname, 'server'), path.join(buildDir, 'server'));
+    copyDir(path.join(__dirname, 'client'), path.join(buildDir, 'client'));
 
-// Copy images và sounds
-if (fs.existsSync(path.join(__dirname, 'html', 'images'))) {
-    copyDir(path.join(__dirname, 'html', 'images'), path.join(buildHtmlDir, 'images'));
-}
-if (fs.existsSync(path.join(__dirname, 'html', 'sounds'))) {
-    copyDir(path.join(__dirname, 'html', 'sounds'), path.join(buildHtmlDir, 'sounds'));
-}
+    // Copy assets
+    ['images', 'sounds'].forEach(folder => {
+        const src = path.join(__dirname, 'html', folder);
+        if (fs.existsSync(src)) {
+            copyDir(src, path.join(buildHtmlDir, folder));
+        }
+    });
 
-// Obfuscate script.js
-console.log('🔐 Obfuscating script.js...');
-const scriptContent = fs.readFileSync(path.join(__dirname, 'html', 'script.js'), 'utf8');
+    // Obfuscate JS
+    console.log('🔐 Obfuscating script.js...');
+    const scriptContent = fs.readFileSync(path.join(__dirname, 'html', 'script.js'), 'utf8');
 
-const obfuscatedScript = JavaScriptObfuscator.obfuscate(scriptContent, {
-    compact: true,
-    controlFlowFlattening: true,
-    controlFlowFlatteningThreshold: 0.75,
-    deadCodeInjection: true,
-    deadCodeInjectionThreshold: 0.4,
-    debugProtection: false,
-    debugProtectionInterval: 0,
-    disableConsoleOutput: false,
-    identifierNamesGenerator: 'hexadecimal',
-    log: false,
-    numbersToExpressions: true,
-    renameGlobals: false,
-    selfDefending: true,
-    simplify: true,
-    splitStrings: true,
-    splitStringsChunkLength: 10,
-    stringArray: true,
-    stringArrayCallsTransform: true,
-    stringArrayEncoding: ['base64'],
-    stringArrayIndexShift: true,
-    stringArrayRotate: true,
-    stringArrayShuffle: true,
-    stringArrayWrappersCount: 2,
-    stringArrayWrappersChainedCalls: true,
-    stringArrayWrappersParametersMaxCount: 4,
-    stringArrayWrappersType: 'function',
-    stringArrayThreshold: 0.75,
-    transformObjectKeys: true,
-    unicodeEscapeSequence: false
-});
+    const obfuscationResult = JavaScriptObfuscator.obfuscate(scriptContent, {
+        compact: true,
+        controlFlowFlattening: true,
+        controlFlowFlatteningThreshold: 0.65,
+        deadCodeInjection: true,
+        deadCodeInjectionThreshold: 0.35,
+        debugProtection: false,
+        disableConsoleOutput: true,
+        identifierNamesGenerator: 'hexadecimal',
+        numbersToExpressions: true,
+        renameGlobals: false,
+        selfDefending: true,
+        simplify: true,
+        splitStrings: true,
+        splitStringsChunkLength: 8,
+        stringArray: true,
+        stringArrayCallsTransform: true,
+        stringArrayCallsTransformThreshold: 0.75,
+        stringArrayEncoding: ['base64'],
+        stringArrayIndexShift: true,
+        stringArrayRotate: true,
+        stringArrayShuffle: true,
+        stringArrayWrappersCount: 2,
+        stringArrayWrappersChainedCalls: true,
+        stringArrayWrappersParametersMaxCount: 5,
+        stringArrayWrappersType: 'function',
+        stringArrayThreshold: 0.8,
+        transformObjectKeys: true,
+        unicodeEscapeSequence: false,
+        preset: 'high-obfuscation',
+    });
 
-fs.writeFileSync(
-    path.join(buildHtmlDir, 'script.js'),
-    obfuscatedScript.getObfuscatedCode()
-);
+    const obfuscatedJS = obfuscationResult.getObfuscatedCode();
 
-// Minify CSS
-console.log('📦 Minifying style.css...');
-const cssContent = fs.readFileSync(path.join(__dirname, 'html', 'style.css'), 'utf8');
-const minifiedCss = cssContent
-    .replace(/\/\*[\s\S]*?\*\//g, '') // Remove comments
-    .replace(/\s+/g, ' ') // Remove extra whitespace
-    .replace(/\s*([{}:;,])\s*/g, '$1') // Remove space around special chars
-    .trim();
+    // Minify CSS - AN TOÀN VỚI CALC()
+    console.log('📦 Minifying style.css (safe for calc & layout)...');
+    let cssContent = fs.readFileSync(path.join(__dirname, 'html', 'style.css'), 'utf8');
 
-fs.writeFileSync(path.join(buildHtmlDir, 'style.css'), minifiedCss);
+    // Bước 1: Xóa comment
+    cssContent = cssContent.replace(/\/\*[\s\S]*?\*\//g, '');
 
-// Copy index.html
-console.log('📄 Copying index.html...');
-fs.copyFileSync(
-    path.join(__dirname, 'html', 'index.html'),
-    path.join(buildHtmlDir, 'index.html')
-);
+    // Bước 2: Giảm space thừa nhưng KHÔNG động mạnh vào calc
+    cssContent = cssContent
+        .replace(/[\n\r\t\f\v]+/g, ' ')                    // xuống dòng → space
+        .replace(/\s*([{};,()])\s*/g, '$1')                // space quanh {},;()
+        .replace(/;}/g, '}')                               // xóa ; thừa trước }
+        .replace(/\s+/g, ' ')                              // nhiều space → 1 space
+        .trim();
 
-// Copy fxmanifest.lua
-console.log('📋 Copying fxmanifest.lua...');
-fs.copyFileSync(
-    path.join(__dirname, 'fxmanifest.lua'),
-    path.join(buildDir, 'fxmanifest.lua')
-);
+    // Bước 3: Bảo vệ và sửa space trong mọi hàm calc()
+    cssContent = cssContent.replace(/calc\(([^)]+)\)/gi, (match, inner) => {
+        let fixed = inner
+            // Đảm bảo space quanh + - * /
+            .replace(/([+\-*\/])/g, ' $1 ')
+            // Dọn space thừa (nhiều space liên tiếp)
+            .replace(/\s+/g, ' ')
+            .trim();
+        return `calc(${fixed})`;
+    });
 
-// Tạo README trong build
-const readme = `# F17 Câu Tôm Tích - Production Build
+    // Inline CSS + JS
+    console.log('🔗 Inlining CSS & obfuscated JS...');
+    let htmlContent = fs.readFileSync(path.join(__dirname, 'html', 'index.html'), 'utf8');
 
-⚠️ ĐÂY LÀ PHIÊN BẢN ĐÃ OBFUSCATE
-- Code JavaScript đã được bảo vệ
-- Không chỉnh sửa trực tiếp trong thư mục này
-- Để phát triển, sửa code ở thư mục gốc rồi chạy: npm run build
+    htmlContent = htmlContent.replace(
+        /<link[^>]*rel=["']stylesheet["'][^>]*href=["']style\.css["'][^>]*>/gi,
+        `<style>${cssContent}</style>`
+    );
 
-📁 Upload toàn bộ thư mục này lên server FiveM
+    htmlContent = htmlContent.replace(
+        /<script[^>]*src=["']script\.js["'][^>]*><\/script>/gi,
+        `<script>${obfuscatedJS}</script>`
+    );
+
+    // Minify HTML - SAFE MODE (giống gốc gần 100%)
+    console.log('📦 Minifying HTML - SAFE MODE (giữ layout & calc)...');
+    const minifiedHTML = await minifyHTML(htmlContent, {
+        collapseWhitespace: false,          // TẮT để giữ space giữa thẻ → panel không bị đè
+        conservativeCollapse: false,
+        collapseInlineTagWhitespace: false,
+        preserveLineBreaks: true,
+        removeComments: true,
+        removeRedundantAttributes: true,
+        removeScriptTypeAttributes: true,
+        removeStyleLinkTypeAttributes: true,
+        minifyCSS: false,          // Đã xử lý tay
+        minifyJS: false,
+        useShortDoctype: true,
+        removeEmptyAttributes: true,
+        collapseBooleanAttributes: true,
+        sortAttributes: false,
+        sortClassName: false,
+        caseSensitive: true,
+        keepClosingSlash: true
+    });
+
+    fs.writeFileSync(path.join(buildHtmlDir, 'index.html'), minifiedHTML);
+
+    // Xóa file thừa
+    ['script.js', 'style.css'].forEach(file => {
+        const p = path.join(buildHtmlDir, file);
+        if (fs.existsSync(p)) fs.unlinkSync(p);
+    });
+
+    // Copy fxmanifest
+    console.log('📋 Copy fxmanifest.lua...');
+    fs.copyFileSync(
+        path.join(__dirname, 'fxmanifest.lua'),
+        path.join(buildDir, 'fxmanifest.lua')
+    );
+
+    // README
+    const readmeContent = `# F17 Câu Tôm Tích - Production Build (Obfuscated & Layout-Safe)
+
+⚠️ ĐÃ BẢO VỆ MẠNH + GIỮ LAYOUT & CALC() GẦN NHƯ GỐC 100%
+• JS obfuscate cao
+• CSS inline với calc() được bảo vệ
+• HTML minify an toàn (không phá panel/ul/flex/calc)
+• Chỉ còn 1 file index.html
+
+Cách dùng:
+1. Sửa code gốc
+2. npm run build
+3. Upload thư mục build lên server FiveM
+
+Build lúc: ${new Date().toLocaleString('vi-VN')}
 `;
 
-fs.writeFileSync(path.join(buildDir, 'README.md'), readme);
+    fs.writeFileSync(path.join(buildDir, 'README.md'), readmeContent);
 
-console.log('\n✅ Build hoàn tất!');
-console.log('📁 Thư mục build đã sẵn sàng tại: ./build/');
-console.log('🚀 Upload thư mục "build" lên FileZilla!');
-console.log('\n📊 Thống kê:');
-console.log('   - script.js: Đã obfuscate ✓');
-console.log('   - style.css: Đã minify ✓');
-console.log('   - Server/Client: Đã copy ✓');
-console.log('   - Assets: Đã copy ✓');
+    console.log('\n' + '='.repeat(70));
+    console.log('✅ BUILD HOÀN TẤT - LAYOUT & CALC() AN TOÀN!');
+    console.log('📂 Vị trí: ' + buildDir);
+    console.log('• Kiểm tra trong CEF browser FiveM');
+    console.log('• left: calc(...) giờ đã có space đúng');
+    console.log('='.repeat(70) + '\n');
+})();

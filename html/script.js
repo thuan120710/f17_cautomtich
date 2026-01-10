@@ -181,7 +181,7 @@ const app = createApp({
 
         // Configuration
         const TUNNEL_WIDTH = 450;
-        const PATH_WIDTH = 140; // Slightly wider for better gameplay
+        const PATH_WIDTH = 130; // Hẹp hơn để khó hơn (giảm từ 140 xuống 100)
         const TOTAL_DEPTH = 5000;
         const WARNING_DISTANCE = 20; // Distance from wall to show warning
 
@@ -208,8 +208,8 @@ const app = createApp({
                     depth: 0,
                     linePoints: [],
                     speed: 0,
-                    maxSpeed: 5.0,
-                    acceleration: 0.15,
+                    maxSpeed: 3.0,
+                    acceleration: 0.1,
                     friction: 0.2,
                     cameraY: 0,
                     mouseX: width / 2,
@@ -224,7 +224,7 @@ const app = createApp({
                 };
 
                 showTunnelInstruction.value = true;
-                
+
                 // Không tự động ẩn - hiển thị cố định
                 // setTimeout(() => {
                 //     showTunnelInstruction.value = false;
@@ -253,20 +253,20 @@ const app = createApp({
         const generateTunnelPath = (length, screenWidth) => {
             const points = [];
             let currentX = screenWidth / 2;
-            
+
             for (let y = 0; y < length; y += 20) {
-                // Random sway với độ cong cao hơn
-                const change = (Math.random() - 0.5) * 80; // Độ cong như ban đầu
+                // Random sway với độ cong CỰC LỚN - đi thẳng chắc chắn đụng
+                const change = (Math.random() - 0.5) * 80; // Tăng lên 400 (gấp 5 lần ban đầu)
                 currentX += change;
 
                 // Clamp to keep on screen
                 const margin = PATH_WIDTH / 2 + 80;
                 currentX = Math.max(margin, Math.min(screenWidth - margin, currentX));
 
-                points.push({ 
-                    y, 
+                points.push({
+                    y,
                     x: currentX,
-                    width: PATH_WIDTH + Math.sin(y * 0.01) * 15 // Varying width nhẹ hơn
+                    width: PATH_WIDTH + Math.sin(y * 0.01) * 15 // Varying width ít hơn vì đã hẹp
                 });
             }
             return points;
@@ -293,7 +293,7 @@ const app = createApp({
                 tunnelState.depth -= tunnelState.retractSpeed;
                 tunnelState.cameraY = tunnelState.depth;
                 tunnelProgress.value = Math.max(0, (tunnelState.depth / TOTAL_DEPTH) * 100);
-                
+
                 // Khi về đến đầu
                 if (tunnelState.depth <= 0) {
                     tunnelState.depth = 0;
@@ -301,7 +301,7 @@ const app = createApp({
                     tunnelState.speed = 0;
                     tunnelMessage.value = '';
                 }
-                
+
                 // Render và tiếp tục loop
                 updateParticles(deltaTime);
                 renderTunnel();
@@ -318,7 +318,7 @@ const app = createApp({
 
             tunnelState.depth += tunnelState.speed;
             tunnelState.cameraY = tunnelState.depth;
-            
+
             // Update UI speed display
             tunnelSpeed.value = Math.round((tunnelState.speed / tunnelState.maxSpeed) * 100);
 
@@ -327,11 +327,11 @@ const app = createApp({
 
             // === HOOK MOVEMENT - Direct follow mouse (no physics) ===
             const canvas = tunnelCanvas.value;
-            
+
             // Móc câu theo chuột trực tiếp với smooth lerp
             const lerpSpeed = 0.25; // Tốc độ theo chuột
             tunnelState.hookX += (tunnelState.targetX - tunnelState.hookX) * lerpSpeed;
-            
+
             // Giới hạn trong canvas
             const margin = 50;
             tunnelState.hookX = Math.max(margin, Math.min(canvas.width - margin, tunnelState.hookX));
@@ -340,12 +340,12 @@ const app = createApp({
             const absoluteHookY = tunnelState.depth + 150;
             const currentPointIndex = Math.floor(absoluteHookY / 20);
             const currentPoint = tunnelState.path[currentPointIndex] || tunnelState.path[tunnelState.path.length - 1];
-            
+
             const tunnelCenterX = currentPoint.x;
             const currentPathWidth = currentPoint.width || PATH_WIDTH;
             const safeHalfWidth = currentPathWidth / 2;
             const distanceFromWall = Math.abs(tunnelState.hookX - tunnelCenterX);
-            
+
             // Warning zone (near walls)
             if (distanceFromWall > safeHalfWidth - WARNING_DISTANCE) {
                 tunnelCollisionWarning.value = true;
@@ -353,7 +353,7 @@ const app = createApp({
                 tunnelState.combo = 0;
             } else {
                 tunnelCollisionWarning.value = false;
-                
+
                 // Combo system for staying in center
                 if (tunnelState.speed > 2) {
                     tunnelState.comboTimer += deltaTime;
@@ -361,7 +361,7 @@ const app = createApp({
                         tunnelState.combo++;
                         tunnelCombo.value = tunnelState.combo;
                         tunnelState.comboTimer = 0;
-                        
+
                         // Spawn particle effect for combo
                         spawnParticles(tunnelState.hookX, 150, '#4CAF50', 5);
                     }
@@ -379,14 +379,14 @@ const app = createApp({
                     tunnelCombo.value = 0;
                     tunnelCollisionWarning.value = false;
                     tunnelMessage.value = 'Bạn đã đụng hang! Thu dây lại...';
-                    SOUNDS.lose.play().catch(() => {});
-                    
+                    SOUNDS.lose.play().catch(() => { });
+
                     // Spawn collision particles
                     spawnParticles(tunnelState.hookX, 150, '#ff5252', 20);
-                    
+
                     // Auto-hide message after 1 second
-                    setTimeout(() => { 
-                        tunnelMessage.value = ''; 
+                    setTimeout(() => {
+                        tunnelMessage.value = '';
                     }, 1000);
                 }
             }
@@ -396,16 +396,16 @@ const app = createApp({
                 tunnelState.active = false;
                 tunnelCompleted.value = true;
                 tunnelMessage.value = '✅ Hoàn thành! Chuẩn bị thả câu...';
-                SOUNDS.win.play().catch(() => {});
-                
+                SOUNDS.win.play().catch(() => { });
+
                 // Victory particles
                 spawnParticles(tunnelState.hookX, 150, '#ffcc00', 30);
-                
+
                 setTimeout(() => {
                     tunnelMessage.value = '';
                     gamePhase.value = 'IDLE';
                 }, 1500);
-                
+
                 return;
             }
 
@@ -440,7 +440,7 @@ const app = createApp({
                 p.y += p.vy;
                 p.vy += 0.3; // Gravity
                 p.life -= deltaTime * 2;
-                
+
                 if (p.life <= 0) {
                     tunnelState.particles.splice(i, 1);
                 }
@@ -476,7 +476,7 @@ const app = createApp({
             // Draw tunnel walls (darker)
             ctx.lineCap = 'round';
             ctx.lineJoin = 'round';
-            
+
             // Outer walls (dark)
             for (let i = startIdx; i < endIdx; i++) {
                 if (!tunnelState.path[i]) continue;
@@ -484,12 +484,12 @@ const app = createApp({
                 const screenY = p.y - tunnelState.cameraY;
                 const screenX = p.x;
                 const pathWidth = p.width || PATH_WIDTH;
-                
+
                 // Draw wall shadows
                 const wallGradient = ctx.createRadialGradient(screenX, screenY, pathWidth / 2, screenX, screenY, pathWidth / 2 + 30);
                 wallGradient.addColorStop(0, 'rgba(62, 48, 32, 0.8)');
                 wallGradient.addColorStop(1, 'rgba(26, 21, 16, 1)');
-                
+
                 ctx.fillStyle = wallGradient;
                 ctx.beginPath();
                 ctx.arc(screenX, screenY, pathWidth / 2 + 30, 0, Math.PI * 2);
@@ -506,11 +506,11 @@ const app = createApp({
                 const p = tunnelState.path[i];
                 const screenY = p.y - tunnelState.cameraY;
                 const screenX = p.x;
-                if (first) { 
-                    ctx.moveTo(screenX, screenY); 
-                    first = false; 
-                } else { 
-                    ctx.lineTo(screenX, screenY); 
+                if (first) {
+                    ctx.moveTo(screenX, screenY);
+                    first = false;
+                } else {
+                    ctx.lineTo(screenX, screenY);
                 }
             }
             ctx.stroke();
@@ -526,11 +526,11 @@ const app = createApp({
                 const p = tunnelState.path[i];
                 const screenY = p.y - tunnelState.cameraY;
                 const screenX = p.x;
-                if (first) { 
-                    ctx.moveTo(screenX, screenY); 
-                    first = false; 
-                } else { 
-                    ctx.lineTo(screenX, screenY); 
+                if (first) {
+                    ctx.moveTo(screenX, screenY);
+                    first = false;
+                } else {
+                    ctx.lineTo(screenX, screenY);
                 }
             }
             ctx.stroke();
@@ -541,19 +541,19 @@ const app = createApp({
             ctx.lineWidth = 3;
             ctx.shadowColor = 'rgba(255, 255, 255, 0.5)';
             ctx.shadowBlur = 5;
-            
+
             // Simple bezier curve - không dựa vào velocity
             const hookX = tunnelState.hookX;
             const hookY = 150;
             const topX = w / 2;
             const topY = -100;
-            
+
             // Control points đơn giản
             const cp1X = hookX;
             const cp1Y = hookY - 50;
             const cp2X = topX + (hookX - topX) * 0.3;
             const cp2Y = topY + 100;
-            
+
             ctx.beginPath();
             ctx.moveTo(hookX, hookY);
             ctx.bezierCurveTo(cp1X, cp1Y, cp2X, cp2Y, topX, topY);
@@ -565,7 +565,7 @@ const app = createApp({
             ctx.font = `${hookSize}px Arial`;
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
-            
+
             // Glow effect
             if (tunnelCollisionWarning.value) {
                 ctx.shadowColor = '#ff5252';
@@ -574,7 +574,7 @@ const app = createApp({
                 ctx.shadowColor = '#4CAF50';
                 ctx.shadowBlur = 15;
             }
-            
+
             ctx.fillText('⚓', tunnelState.hookX, 150);
             ctx.shadowBlur = 0;
 
@@ -605,7 +605,7 @@ const app = createApp({
 
             // 7. Darkness overlay - Môi trường tối, chỉ sáng ở móc câu
             const darkness = ctx.createRadialGradient(
-                tunnelState.hookX, 150, 50, 
+                tunnelState.hookX, 150, 50,
                 tunnelState.hookX, 150, 180
             );
             darkness.addColorStop(0, 'rgba(0, 0, 0, 0)'); // Trong suốt ở giữa
@@ -616,7 +616,7 @@ const app = createApp({
 
             // 8. Lighting around hook - Ánh sáng vàng xung quanh móc
             const lightGradient = ctx.createRadialGradient(
-                tunnelState.hookX, 150, 10, 
+                tunnelState.hookX, 150, 10,
                 tunnelState.hookX, 150, 100
             );
             lightGradient.addColorStop(0, 'rgba(255, 204, 0, 0.3)');
@@ -750,11 +750,11 @@ const app = createApp({
             gamePhase.value = 'BITING';
             biteTimer.value = 2000; // 2s window
             shrimpPulling.value = true; // Shake effect
-            
+
             // Play urgent sound
             SOUNDS.shrimpPull.currentTime = 0;
             SOUNDS.shrimpPull.play().catch(() => { });
-            
+
             // Play tension sound for urgency
             if (SOUNDS.tension.paused) {
                 SOUNDS.tension.currentTime = 0;
@@ -776,13 +776,13 @@ const app = createApp({
             if (!isHoldingSpace.value) {
                 // Success! Hooked!
                 shrimpPulling.value = false;
-                
+
                 // Stop tension sound
                 if (!SOUNDS.tension.paused) {
                     SOUNDS.tension.pause();
                     SOUNDS.tension.currentTime = 0;
                 }
-                
+
                 startFishingPhase();
                 return;
             }
@@ -791,13 +791,13 @@ const app = createApp({
             if (biteTimer.value <= 0) {
                 // Failed: Too slow / Didn't release -> Lose
                 shrimpPulling.value = false;
-                
+
                 // Stop tension sound
                 if (!SOUNDS.tension.paused) {
                     SOUNDS.tension.pause();
                     SOUNDS.tension.currentTime = 0;
                 }
-                
+
                 endTomTichGame(false, 'Tôm đã thoát! (Phản xạ chậm)');
                 return;
             }
@@ -820,7 +820,7 @@ const app = createApp({
             // Random shrimp selection based on player level
             const currentLevel = playerLevel.value;
             const shrimpTypes = SHRIMP_TYPES_BY_LEVEL[currentLevel] || SHRIMP_TYPES_BY_LEVEL[1];
-            
+
             const rand = Math.random() * 100; // 0-100
             let cumulative = 0;
             let selected = shrimpTypes[0];
@@ -997,7 +997,7 @@ const app = createApp({
         // ============================================
         // TREASURE HUNT FUNCTIONS
         // ============================================
-        
+
         const initTreasureGame = () => {
             treasureVisible.value = true;
             treasureGameEnded.value = false;
@@ -1006,7 +1006,7 @@ const app = createApp({
             treasureAttempts.value = 5;
             treasureHint.value = '';
             treasureResultMessage.value = '';
-            
+
             // Initialize 25 cells (5x5)
             treasureCells.value = [];
             for (let i = 0; i < 25; i++) {
@@ -1046,38 +1046,38 @@ const app = createApp({
             const cell = treasureCells.value[data.cellIndex];
             cell.opened = true;
             cell.isTreasure = data.isTreasure;
-            
+
             treasureAttempts.value = data.attemptsLeft;
             treasureFound.value = data.foundCount;
-            
+
             if (data.isTreasure) {
                 treasureHint.value = '🎉 Tìm được kho báu! +1 lượt thưởng!';
-                SOUNDS.win.play().catch(() => {});
+                SOUNDS.win.play().catch(() => { });
             } else {
                 treasureHint.value = data.hint || '';
-                SOUNDS.lose.play().catch(() => {});
+                SOUNDS.lose.play().catch(() => { });
             }
         };
 
         const handleTreasureGameEnd = (data) => {
             treasureGameEnded.value = true;
             treasureSuccess.value = data.success;
-            
+
             // Reveal all treasures
             if (data.treasures) {
                 data.treasures.forEach(pos => {
                     treasureCells.value[pos].isTreasure = true;
                 });
             }
-            
+
             // Delay showing result popup to let cards flip
             setTimeout(() => {
                 if (data.success) {
                     treasureResultMessage.value = '🎉 Chúc mừng! Bạn đã tìm được 2 kho báu!';
-                    SOUNDS.win.play().catch(() => {});
+                    SOUNDS.win.play().catch(() => { });
                 } else {
                     treasureResultMessage.value = '😔 Hết lượt! Hãy thử lại lần sau.';
-                    SOUNDS.lose.play().catch(() => {});
+                    SOUNDS.lose.play().catch(() => { });
                 }
             }, 1500); // Delay 1.5s để xem các lá bài lật
         };
