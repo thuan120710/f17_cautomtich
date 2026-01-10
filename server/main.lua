@@ -21,7 +21,8 @@ local ITEMS = {
     COMMON = "tomtich",         -- Tôm tích thường
     UNCOMMON = "tomtichxanh",  -- Tôm tích xanh
     RARE = "tomtichdo",        -- Tôm tích đỏ
-    LEGENDARY = "tomtichhoangkim" -- Tôm tích hoàng kim
+    LEGENDARY = "tomtichhoangkim", -- Tôm tích hoàng kim
+    TREASURE = "khobau"        -- Kho báu (từ mini game)
 }
 
 -- Hệ thống Level
@@ -36,7 +37,8 @@ local LEVEL_CONFIG = {
             [ITEMS.COMMON] = 60,
             [ITEMS.UNCOMMON] = 35,
             [ITEMS.RARE] = 5,
-            [ITEMS.LEGENDARY] = 0
+            [ITEMS.LEGENDARY] = 0,
+            treasure = 0  -- Không có kho báu ở level 1
         }
     },
     [2] = {
@@ -45,7 +47,8 @@ local LEVEL_CONFIG = {
             [ITEMS.COMMON] = 45,
             [ITEMS.UNCOMMON] = 40,
             [ITEMS.RARE] = 10,
-            [ITEMS.LEGENDARY] = 5
+            [ITEMS.LEGENDARY] = 5,
+            treasure = 0  -- Không có kho báu ở level 2
         }
     },
     [3] = {
@@ -54,7 +57,8 @@ local LEVEL_CONFIG = {
             [ITEMS.COMMON] = 40,
             [ITEMS.UNCOMMON] = 30,
             [ITEMS.RARE] = 15,
-            [ITEMS.LEGENDARY] = 15
+            [ITEMS.LEGENDARY] = 10,
+            treasure = 5  -- 5% cơ hội kho báu ở level 3
         }
     }
 }
@@ -64,7 +68,8 @@ local EXP_REWARDS = {
     [ITEMS.COMMON] = 5,
     [ITEMS.UNCOMMON] = 10,
     [ITEMS.RARE] = 20,
-    [ITEMS.LEGENDARY] = 50
+    [ITEMS.LEGENDARY] = 50,
+    [ITEMS.TREASURE] = 100
 }
 
 -- Hàm lấy level của người chơi
@@ -237,5 +242,202 @@ AddEventHandler('playerDropped', function()
     local src = source
     if activeTomTichGames[src] then
         activeTomTichGames[src] = nil
+    end
+end)
+
+-- ============================================
+-- MINIGAME KHO BÁU (TREASURE HUNT)
+-- ============================================
+
+local activeTreasureGames = {}
+
+RegisterNetEvent('treasure:startGame')
+AddEventHandler('treasure:startGame', function()
+    local src = source
+    
+    -- Generate treasure positions (2 treasures in 5x5 grid)
+    local treasurePositions = {}
+    while #treasurePositions < 2 do
+        local pos = math.random(0, 24) -- 0-24 for 5x5 grid
+        local exists = false
+        for _, p in ipairs(treasurePositions) do
+            if p == pos then
+                exists = true
+                break
+            end
+        end
+        if not exists then
+            table.insert(treasurePositions, pos)
+        end
+    end
+    
+    activeTreasureGames[src] = {
+        active = true,
+        treasures = treasurePositions,
+        foundTreasures = {},
+        attempts = 5,
+        openedCells = {}
+    }
+    
+    -- Send game data to client
+    TriggerClientEvent('treasure:gameData', src, {
+        attempts = 5
+    })
+end)
+
+RegisterNetEvent('treasure:openCell')
+AddEventHandler('treasure:openCell', function(cellIndex)
+    local src = source
+    local game = activeTreasureGames[src]
+    
+    if not game or not game.active then return end
+    
+    -- Check if already opened
+    for _, opened in ipairs(game.openedCells) do
+        if opened == cellIndex then
+            return
+        end
+    end
+    
+    table.insert(game.openedCells, cellIndex)
+    
+    -- Check if treasure
+    local isTreasure = false
+    for _, treasurePos in ipairs(game.treasures) do
+        if treasurePos == cellIndex then
+            isTreasure = true
+            table.insert(game.foundTreasures, cellIndex)
+            game.attempts = game.attempts + 1 -- Bonus turn
+            break
+        end
+    end
+    
+    if isTreasure then
+        -- Found treasure
+        TriggerClientEvent('treasure:cellResult', src, {
+            cellIndex = cellIndex,
+            isTreasure = true,
+            attemptsLeft = game.attempts,
+            foundCount = #game.foundTreasures
+        })
+        
+        -- Check win condition
+        if #game.foundTreasures >= 2 then
+            -- WIN!
+            TriggerClientEvent('treasure:gameEnd', src, {
+                success = true,
+                treasures = game.treasures
+            })
+            
+            -- Give rewards
+            if INVENTORY_TYPE == "OX_INVENTORY" then
+                exports.ox_inventory:AddItem(src, ITEMS.TREASURE, 2)
+            end
+            
+            TriggerClientEvent('cautomtich:notification', src, ITEMS.TREASURE, "🎉 Chúc mừng! Bạn đã tìm được 2 kho báu!")
+            
+            activeTreasureGames[src] = nil
+        end
+    else
+        -- Not treasure - give hint
+        game.attempts = game.attempts - 1
+        
+        local hint = generateHint(cellIndex, game.treasures, game.foundTreasures)
+        
+        TriggerClientEvent('treasure:cellResult', src, {
+            cellIndex = cellIndex,
+            isTreasure = false,
+            hint = hint,
+            attemptsLeft = game.attempts,
+            foundCount = #game.foundTreasures
+        })
+        
+        -- Check lose condition
+        if game.attempts <= 0 and #game.foundTreasures < 2 then
+            -- LOSE!
+            TriggerClientEvent('treasure:gameEnd', src, {
+                success = false,
+                treasures = game.treasures
+            })
+            
+            TriggerClientEvent('cautomtich:notification', src, nil, "😔 Hết lượt! Bạn chưa tìm đủ kho báu.")
+            
+            activeTreasureGames[src] = nil
+        end
+    end
+end)
+
+-- Generate smart hint
+function generateHint(cellIndex, treasures, foundTreasures)
+    -- Convert index to row, col
+    local row = math.floor(cellIndex / 5)
+    local col = cellIndex % 5
+    
+    -- Find closest unfound treasure
+    local closestTreasure = nil
+    local minDistance = 999
+    
+    for _, treasurePos in ipairs(treasures) do
+        local alreadyFound = false
+        for _, found in ipairs(foundTreasures) do
+            if found == treasurePos then
+                alreadyFound = true
+                break
+            end
+        end
+        
+        if not alreadyFound then
+            local tRow = math.floor(treasurePos / 5)
+            local tCol = treasurePos % 5
+            local distance = math.abs(row - tRow) + math.abs(col - tCol)
+            
+            if distance < minDistance then
+                minDistance = distance
+                closestTreasure = treasurePos
+            end
+        end
+    end
+    
+    if not closestTreasure then
+        return "Không còn kho báu nào!"
+    end
+    
+    local tRow = math.floor(closestTreasure / 5)
+    local tCol = closestTreasure % 5
+    
+    local rowDiff = tRow - row
+    local colDiff = tCol - col
+    
+    -- Diagonal neighbor (1 cell away diagonally)
+    if math.abs(rowDiff) == 1 and math.abs(colDiff) == 1 then
+        return "🔥 Kho báu đã gần bạn lắm rồi!"
+    end
+    
+    -- Adjacent neighbor (1 cell away horizontally or vertically)
+    if (math.abs(rowDiff) == 1 and colDiff == 0) or (rowDiff == 0 and math.abs(colDiff) == 1) then
+        local direction = ""
+        if rowDiff < 0 then direction = "Trên"
+        elseif rowDiff > 0 then direction = "Dưới"
+        elseif colDiff < 0 then direction = "Trái"
+        elseif colDiff > 0 then direction = "Phải"
+        end
+        return "🎯 Kho báu hình như nằm gần phía " .. direction
+    end
+    
+    -- Far away
+    local directions = {}
+    if rowDiff < 0 then table.insert(directions, "Trên") end
+    if rowDiff > 0 then table.insert(directions, "Dưới") end
+    if colDiff < 0 then table.insert(directions, "Trái") end
+    if colDiff > 0 then table.insert(directions, "Phải") end
+    
+    return "📍 Xa – " .. table.concat(directions, "/")
+end
+
+RegisterNetEvent('treasure:close')
+AddEventHandler('treasure:close', function()
+    local src = source
+    if activeTreasureGames[src] then
+        activeTreasureGames[src] = nil
     end
 end)

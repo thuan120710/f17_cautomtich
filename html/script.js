@@ -48,6 +48,16 @@ const app = createApp({
         const tunnelCollisionWarning = ref(false); // Warning when near wall
         const tunnelCombo = ref(0); // Combo for staying in center
 
+        // TREASURE HUNT STATE
+        const treasureVisible = ref(false);
+        const treasureCells = ref([]);
+        const treasureAttempts = ref(5);
+        const treasureFound = ref(0);
+        const treasureHint = ref('');
+        const treasureGameEnded = ref(false);
+        const treasureSuccess = ref(false);
+        const treasureResultMessage = ref('');
+
 
         // Game Configuration - Level System
         const SHRIMP_TYPES_BY_LEVEL = {
@@ -971,12 +981,114 @@ const app = createApp({
                 if (event.data.level) {
                     playerLevel.value = Math.min(3, Math.max(1, event.data.level));
                 }
+            } else if (event.data.action === 'showTreasure') {
+                initTreasureGame();
+            } else if (event.data.action === 'hideTreasure') {
+                closeTreasureGame();
+            } else if (event.data.action === 'treasureGameData') {
+                treasureAttempts.value = event.data.data.attempts;
+            } else if (event.data.action === 'treasureCellResult') {
+                handleTreasureCellResult(event.data.data);
+            } else if (event.data.action === 'treasureGameEnd') {
+                handleTreasureGameEnd(event.data.data);
             }
         };
 
+        // ============================================
+        // TREASURE HUNT FUNCTIONS
+        // ============================================
+        
+        const initTreasureGame = () => {
+            treasureVisible.value = true;
+            treasureGameEnded.value = false;
+            treasureSuccess.value = false;
+            treasureFound.value = 0;
+            treasureAttempts.value = 5;
+            treasureHint.value = '';
+            treasureResultMessage.value = '';
+            
+            // Initialize 25 cells (5x5)
+            treasureCells.value = [];
+            for (let i = 0; i < 25; i++) {
+                treasureCells.value.push({
+                    opened: false,
+                    isTreasure: false
+                });
+            }
+        };
+
+        const closeTreasureGame = () => {
+            treasureVisible.value = false;
+        };
+
+        const handleTreasureClose = () => {
+            closeTreasureGame();
+            fetch(`https://${getParentResourceName()}/closeTreasure`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({})
+            });
+        };
+
+        const openTreasureCell = (index) => {
+            if (treasureGameEnded.value || treasureCells.value[index].opened) {
+                return;
+            }
+
+            fetch(`https://${getParentResourceName()}/treasureOpenCell`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ cellIndex: index })
+            });
+        };
+
+        const handleTreasureCellResult = (data) => {
+            const cell = treasureCells.value[data.cellIndex];
+            cell.opened = true;
+            cell.isTreasure = data.isTreasure;
+            
+            treasureAttempts.value = data.attemptsLeft;
+            treasureFound.value = data.foundCount;
+            
+            if (data.isTreasure) {
+                treasureHint.value = '🎉 Tìm được kho báu! +1 lượt thưởng!';
+                SOUNDS.win.play().catch(() => {});
+            } else {
+                treasureHint.value = data.hint || '';
+                SOUNDS.lose.play().catch(() => {});
+            }
+        };
+
+        const handleTreasureGameEnd = (data) => {
+            treasureGameEnded.value = true;
+            treasureSuccess.value = data.success;
+            
+            // Reveal all treasures
+            if (data.treasures) {
+                data.treasures.forEach(pos => {
+                    treasureCells.value[pos].isTreasure = true;
+                });
+            }
+            
+            // Delay showing result popup to let cards flip
+            setTimeout(() => {
+                if (data.success) {
+                    treasureResultMessage.value = '🎉 Chúc mừng! Bạn đã tìm được 2 kho báu!';
+                    SOUNDS.win.play().catch(() => {});
+                } else {
+                    treasureResultMessage.value = '😔 Hết lượt! Hãy thử lại lần sau.';
+                    SOUNDS.lose.play().catch(() => {});
+                }
+            }, 1500); // Delay 1.5s để xem các lá bài lật
+        };
+
         const handleKeydown = (e) => {
-            if (e.key === 'Escape' && tomtichVisible.value) {
-                handleTomTichClose();
+            if (e.key === 'Escape') {
+                if (tomtichVisible.value) {
+                    handleTomTichClose();
+                } else if (treasureVisible.value) {
+                    handleTreasureClose();
+                }
             }
             if (e.code === 'Space') {
                 isHoldingSpace.value = true; // Always set true on press
@@ -1042,7 +1154,18 @@ const app = createApp({
             currentShrimpImage,
             playerLevel,
             handleTomTichClose,
-            startTomTichGame: () => { /* No-op, auto start via space */ }
+            startTomTichGame: () => { /* No-op, auto start via space */ },
+            // Treasure Hunt
+            treasureVisible,
+            treasureCells,
+            treasureAttempts,
+            treasureFound,
+            treasureHint,
+            treasureGameEnded,
+            treasureSuccess,
+            treasureResultMessage,
+            handleTreasureClose,
+            openTreasureCell
         };
     }
 });
