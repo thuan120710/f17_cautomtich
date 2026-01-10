@@ -1087,9 +1087,10 @@ body {
     max-width: 40.625rem;
     width: 85%;
     box-shadow: 0 1.25rem 3.75rem rgba(0, 0, 0, 0.5);
-    border: 0.188rem solid rgba(139, 115, 85, 0.6);
+    border: 0.6rem solid rgba(139, 115, 85, 0.6);
     position: relative;
     user-select: none;
+    overflow: hidden;
 }
 
 /* Header Bar for Phase 2 (Game phases) */
@@ -1102,12 +1103,13 @@ body {
     background: linear-gradient(135deg, rgba(0, 0, 0, 0.85) 0%, rgba(20, 20, 20, 0.8) 100%);
     backdrop-filter: blur(0.625rem);
     border-bottom: 0.188rem solid #8b7355;
-    border-radius: 2.188rem 0 0 0;
+    border-radius: 1.188rem 1.188rem 0 0;
     display: flex;
     align-items: center;
     justify-content: space-between;
     padding: 0 0 0 1.25rem;
     z-index: 10;
+    margin: 0 0 0 0;
 }
 
 .game-title-header {

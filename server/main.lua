@@ -256,9 +256,16 @@ AddEventHandler('treasure:startGame', function()
     local src = source
     
     -- Generate treasure positions (2 treasures in 5x5 grid)
+    -- Ensure they are not too close to each other (at least 2 cells apart)
     local treasurePositions = {}
-    while #treasurePositions < 2 do
+    local maxAttempts = 100
+    local attempts = 0
+    
+    while #treasurePositions < 2 and attempts < maxAttempts do
+        attempts = attempts + 1
         local pos = math.random(0, 24) -- 0-24 for 5x5 grid
+        
+        -- Check if position already exists
         local exists = false
         for _, p in ipairs(treasurePositions) do
             if p == pos then
@@ -266,22 +273,45 @@ AddEventHandler('treasure:startGame', function()
                 break
             end
         end
+        
         if not exists then
-            table.insert(treasurePositions, pos)
+            -- If this is the second treasure, check distance from first
+            if #treasurePositions == 1 then
+                local firstPos = treasurePositions[1]
+                local row1 = math.floor(firstPos / 5)
+                local col1 = firstPos % 5
+                local row2 = math.floor(pos / 5)
+                local col2 = pos % 5
+                
+                -- Manhattan distance (at least 3 cells apart for better difficulty)
+                local distance = math.abs(row1 - row2) + math.abs(col1 - col2)
+                
+                if distance >= 3 then
+                    table.insert(treasurePositions, pos)
+                end
+            else
+                -- First treasure, just add it
+                table.insert(treasurePositions, pos)
+            end
         end
+    end
+    
+    -- Fallback if couldn't find good positions
+    if #treasurePositions < 2 then
+        treasurePositions = {math.random(0, 11), math.random(13, 24)}
     end
     
     activeTreasureGames[src] = {
         active = true,
         treasures = treasurePositions,
         foundTreasures = {},
-        attempts = 5,
+        attempts = 4,
         openedCells = {}
     }
     
     -- Send game data to client
     TriggerClientEvent('treasure:gameData', src, {
-        attempts = 5
+        attempts = 4
     })
 end)
 
@@ -408,23 +438,18 @@ function generateHint(cellIndex, treasures, foundTreasures)
     local rowDiff = tRow - row
     local colDiff = tCol - col
     
-    -- Diagonal neighbor (1 cell away diagonally)
-    if math.abs(rowDiff) == 1 and math.abs(colDiff) == 1 then
+    -- Adjacent (ngang/dọc 1 ô) - Gần nhất
+    if (math.abs(rowDiff) == 1 and colDiff == 0) or 
+       (rowDiff == 0 and math.abs(colDiff) == 1) then
         return "🔥 Kho báu đã gần bạn lắm rồi!"
     end
     
-    -- Adjacent neighbor (1 cell away horizontally or vertically)
-    if (math.abs(rowDiff) == 1 and colDiff == 0) or (rowDiff == 0 and math.abs(colDiff) == 1) then
-        local direction = ""
-        if rowDiff < 0 then direction = "Trên"
-        elseif rowDiff > 0 then direction = "Dưới"
-        elseif colDiff < 0 then direction = "Trái"
-        elseif colDiff > 0 then direction = "Phải"
-        end
-        return "🎯 Kho báu hình như nằm gần phía " .. direction
+    -- Diagonal (chéo 1 ô) - Gần
+    if math.abs(rowDiff) == 1 and math.abs(colDiff) == 1 then
+        return "🎯 Kho báu ở gần đây"
     end
     
-    -- Far away
+    -- Far away - give general direction
     local directions = {}
     if rowDiff < 0 then table.insert(directions, "Trên") end
     if rowDiff > 0 then table.insert(directions, "Dưới") end
