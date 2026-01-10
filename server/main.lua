@@ -1,21 +1,3 @@
--- ============================================
--- SERVER LOGIC - Mini Game Câu Tôm Tích
--- ============================================
-
-ESX = nil
-QBCore = nil
-
-local INVENTORY_TYPE = "OX_INVENTORY"
-
-if INVENTORY_TYPE == "ESX" then
-    TriggerEvent('esx:getSharedObject', function(obj) ESX = obj end)
-elseif INVENTORY_TYPE == "QBCORE" then
-    QBCore = exports['qb-core']:GetCoreObject()
-elseif INVENTORY_TYPE == "VRP" then
-    local Proxy = module("vrp", "lib/Proxy")
-    vRP = Proxy.getInterface("vRP")
-end
-
 local ITEMS = {
     TRASH = "racthainhua",
     COMMON = "tomtich",         -- Tôm tích thường
@@ -125,32 +107,10 @@ local function GetRandomShrimpByLevel(level)
     return ITEMS.COMMON -- Fallback
 end
 
--- Helper function to give reward
-function GiveReward(playerId, item, reason)
-    if INVENTORY_TYPE == "ESX" then
-        local xPlayer = ESX.GetPlayerFromId(playerId)
-        if xPlayer then xPlayer.addInventoryItem(item, 1) end
-    elseif INVENTORY_TYPE == "QBCORE" then
-        local Player = QBCore.Functions.GetPlayer(playerId)
-        if Player then
-            Player.Functions.AddItem(item, 1)
-            TriggerClientEvent('inventory:client:ItemBox', playerId, QBCore.Shared.Items[item], "add")
-        end
-    elseif INVENTORY_TYPE == "VRP" then
-        local user_id = vRP.getUserId({playerId})
-        if user_id then vRP.giveInventoryItem({user_id, item, 1, true}) end
-    elseif INVENTORY_TYPE == "OX_INVENTORY" then
-        exports.ox_inventory:AddItem(playerId, item, 1)
-    end
-    
-    TriggerClientEvent('cautomtich:notification', playerId, item, reason)
-end
-
 -- ============================================
 -- MINIGAME TÔM TÍCH
 -- ============================================
 
-local TOMTICH_ITEM = "tomtich"
 local activeTomTichGames = {}
 local playerCooldowns = {} -- Anti-spam
 
@@ -182,6 +142,9 @@ end)
 RegisterNetEvent('tomtich:attempt')
 AddEventHandler('tomtich:attempt', function(success, itemCode, customMessage)
     local src = source
+    
+    print("🔍 [DEBUG] tomtich:attempt được gọi - Player: " .. src .. " | Success: " .. tostring(success))
+    
     local game = activeTomTichGames[src]
     
     if not game or not game.active then 
@@ -233,29 +196,17 @@ AddEventHandler('tomtich:attempt', function(success, itemCode, customMessage)
     end
     
     -- Thêm item vào inventory
-    if INVENTORY_TYPE == "ESX" then
-        local xPlayer = ESX.GetPlayerFromId(src)
-        if xPlayer then xPlayer.addInventoryItem(item, 1) end
-    elseif INVENTORY_TYPE == "QBCORE" then
-        local Player = QBCore.Functions.GetPlayer(src)
-        if Player then
-            Player.Functions.AddItem(item, 1)
-            TriggerClientEvent('inventory:client:ItemBox', src, QBCore.Shared.Items[item], "add")
-        end
-    elseif INVENTORY_TYPE == "VRP" then
-        local user_id = vRP.getUserId({src})
-        if user_id then vRP.giveInventoryItem({user_id, item, 1, true}) end
-    elseif INVENTORY_TYPE == "OX_INVENTORY" then
-        exports.ox_inventory:AddItem(src, item, 1)
+    print("🎁 [DEBUG] Đang thêm item: " .. item .. " cho player: " .. src)
+    local success, res = ox:AddItem(src, item, 1)
+    if success then
+        print("✅ [DEBUG] Hoàn thành thêm item")  
+        TriggerClientEvent('tomtich:gameResult', src, success, item)
+        TriggerClientEvent('cautomtich:notification', src, item, reason)
+        
+        activeTomTichGames[src] = nil
+    else
+        print('Túi đồ đã đầy')
     end
-    
-    -- Gửi kết quả về client (gửi item server đã random, không phải client gửi lên)
-    TriggerClientEvent('tomtich:gameResult', src, success, item)
-    
-    -- Notification
-    TriggerClientEvent('cautomtich:notification', src, item, reason)
-    
-    activeTomTichGames[src] = nil
 end)
 
 AddEventHandler('playerDropped', function()
@@ -379,11 +330,7 @@ AddEventHandler('treasure:openCell', function(cellIndex)
                 treasures = game.treasures
             })
             
-            -- Give rewards
-            if INVENTORY_TYPE == "OX_INVENTORY" then
-                exports.ox_inventory:AddItem(src, ITEMS.TREASURE, 2)
-            end
-            
+            ox:AddItem(src, ITEMS.TREASURE, 2)           
             TriggerClientEvent('cautomtich:notification', src, ITEMS.TREASURE, "🎉 Chúc mừng! Bạn đã tìm được 2 kho báu!")
             
             activeTreasureGames[src] = nil

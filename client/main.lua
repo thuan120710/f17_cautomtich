@@ -1,12 +1,3 @@
--- ============================================
--- CLIENT LOGIC - Mini Game Câu Tôm Tích
--- ============================================
-
--- ============================================
--- CẤU HÌNH
--- ============================================
-local NOTIFICATION_TYPE = "STANDALONE"  -- Dùng notification mặc định GTA
-
 -- Điểm câu tôm tích
 local TOMTICH_POINT = vector3(-1903.75, -827.08, 0.56)
 
@@ -15,21 +6,6 @@ local TREASURE_POINT = vector4(-1525.51, -1269.09, 2.09, 220.49)
 
 local SPAWN_COOLDOWN = 5  -- 5 giây (Test)
 local INTERACTION_DISTANCE = 2.0  -- Khoảng cách tương tác
-
--- Khởi tạo framework (nếu cần)
-ESX = nil
-QBCore = nil
-
-if NOTIFICATION_TYPE == "ESX" then
-    Citizen.CreateThread(function()
-        while ESX == nil do
-            TriggerEvent('esx:getSharedObject', function(obj) ESX = obj end)
-            Citizen.Wait(0)
-        end
-    end)
-elseif NOTIFICATION_TYPE == "QBCORE" then
-    QBCore = exports['qb-core']:GetCoreObject()
-end
 
 -- Trạng thái minigame tôm tích
 local isTomTichActive = false
@@ -66,22 +42,7 @@ AddEventHandler('cautomtich:notification', function(item, reason)
     }
     
     local message = messages[reason] or reason or "Bạn đã nhận được phần thưởng!"
-    
-    -- Hiển thị notification theo system
-    if NOTIFICATION_TYPE == "ESX" then
-        ESX.ShowNotification(message)
-    elseif NOTIFICATION_TYPE == "QBCORE" then
-        QBCore.Functions.Notify(message, 'success', 5000)
-    elseif NOTIFICATION_TYPE == "MYTHIC" then
-        exports['mythic_notify']:DoHudText('success', message)
-    elseif NOTIFICATION_TYPE == "OKOKNOTIFY" then
-        exports['okokNotify']:Alert("Mini Game", message, 5000, 'success')
-    else
-        -- STANDALONE - Notification mặc định GTA
-        SetNotificationTextEntry('STRING')
-        AddTextComponentString(message)
-        DrawNotification(false, false)
-    end
+    no:Notify(message, 'success', 5000)
 end)
 
 -- Nhận cập nhật level từ server
