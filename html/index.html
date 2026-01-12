@@ -360,11 +360,6 @@
                     </div>
                 </div>
 
-                <div v-if="treasureHint" class="treasure-hint">
-                    <span class="hint-icon">💡</span>
-                    <span class="hint-text">{{ treasureHint }}</span>
-                </div>
-
                 <div class="treasure-grid">
                     <div 
                         v-for="(cell, index) in treasureCells" 
@@ -386,6 +381,11 @@
                             <span v-else class="trash-icon">🗑️</span>
                         </div>
                     </div>
+                </div>
+
+                <div v-if="treasureHint" class="treasure-hint">
+                    <span class="hint-icon">💡</span>
+                    <span class="hint-text">{{ treasureHint }}</span>
                 </div>
 
                 <div v-if="treasureGameEnded && treasureResultMessage" class="treasure-result">
