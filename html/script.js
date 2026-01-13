@@ -575,7 +575,12 @@ const app = createApp({
                 ctx.shadowBlur = 15;
             }
 
-            ctx.fillText('⚓', tunnelState.hookX, 150);
+            // Xoay canvas để vẽ con ốc ngược đầu
+            ctx.save();
+            ctx.translate(tunnelState.hookX, 150);
+            ctx.rotate(Math.PI / 4); // Xoay 45 độ
+            ctx.fillText('🐚', 0, 0);
+            ctx.restore();
             ctx.shadowBlur = 0;
 
             // 5. Draw particles
