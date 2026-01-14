@@ -24,7 +24,7 @@ local LEVEL_CONFIG = {
         }
     },
     [2] = {
-        expRequired = 100, -- Cần 100 exp để lên level 2
+        expRequired = 50, -- Cần 50 exp để lên level 2 (1 ván)
         rates = {
             [ITEMS.COMMON] = 45,
             [ITEMS.UNCOMMON] = 40,
@@ -34,7 +34,7 @@ local LEVEL_CONFIG = {
         }
     },
     [3] = {
-        expRequired = 300, -- Cần 300 exp để lên level 3
+        expRequired = 100, -- Cần 100 exp để lên level 3 (2 ván)
         rates = {
             [ITEMS.COMMON] = 40,
             [ITEMS.UNCOMMON] = 30,
@@ -45,12 +45,12 @@ local LEVEL_CONFIG = {
     }
 }
 
--- Exp nhận được khi câu tôm
+-- Exp nhận được khi câu tôm - Tăng lên để nhanh lên level
 local EXP_REWARDS = {
-    [ITEMS.COMMON] = 5,
-    [ITEMS.UNCOMMON] = 10,
-    [ITEMS.RARE] = 20,
-    [ITEMS.LEGENDARY] = 50,
+    [ITEMS.COMMON] = 50,      -- Tăng từ 5 lên 50
+    [ITEMS.UNCOMMON] = 50,    -- Tăng từ 10 lên 50
+    [ITEMS.RARE] = 50,        -- Tăng từ 20 lên 50
+    [ITEMS.LEGENDARY] = 50,   -- Tăng từ 50 lên 50
     [ITEMS.TREASURE] = 100
 }
 
@@ -178,8 +178,12 @@ AddEventHandler('tomtich:attempt', function(success, itemCode, customMessage)
     local item = success and rewardItem or ITEMS.TRASH
     local reason = success and "tomtich_success" or "tomtich_fail"
     
+    -- Lưu trạng thái câu thành công và level hiện tại TRƯỚC KHI thêm EXP
+    local fishingSuccess = success
+    local currentPlayerLevel = game.level
+    
     -- Thêm EXP nếu thành công
-    if success and rewardItem ~= ITEMS.TRASH then
+    if fishingSuccess and rewardItem ~= ITEMS.TRASH then
         local expGained = EXP_REWARDS[rewardItem] or 0
         local leveledUp, newLevel = AddExperience(src, expGained)
         
@@ -187,26 +191,62 @@ AddEventHandler('tomtich:attempt', function(success, itemCode, customMessage)
             -- Thông báo level up
             TriggerClientEvent('cautomtich:notification', src, nil, 
                 string.format("🎉 LEVEL UP! Bạn đã đạt Level %d!", newLevel))
+            
+            -- Cập nhật level sau khi level up
+            currentPlayerLevel = newLevel
         end
         
         -- Cập nhật level mới về client
         local currentExp = GetPlayerExp(src)
-        local currentLevel = GetPlayerLevel(src)
-        TriggerClientEvent('tomtich:updateLevel', src, currentLevel, currentExp)
+        local finalLevel = GetPlayerLevel(src)
+        TriggerClientEvent('tomtich:updateLevel', src, finalLevel, currentExp)
     end
     
     -- Thêm item vào inventory
     print("🎁 [DEBUG] Đang thêm item: " .. item .. " cho player: " .. src)
-    local success, res = ox:AddItem(src, item, 1)
-    if success then
-        print("✅ [DEBUG] Hoàn thành thêm item")  
-        TriggerClientEvent('tomtich:gameResult', src, success, item)
-        TriggerClientEvent('cautomtich:notification', src, item, reason)
-        
-        activeTomTichGames[src] = nil
+    local addItemSuccess = ox:AddItem(src, item, 1)
+    
+    print("🎁 [DEBUG] AddItem result: " .. tostring(addItemSuccess))
+    
+    -- Gửi kết quả về client
+    TriggerClientEvent('tomtich:gameResult', src, fishingSuccess, item)
+    TriggerClientEvent('cautomtich:notification', src, item, reason)
+    
+    -- Kiểm tra level 3 và câu thành công -> 90% cơ hội hiển thị kho báu
+    -- QUAN TRỌNG: Kiểm tra BẤT KỂ AddItem thành công hay không
+    print("🔍 [DEBUG] Kiểm tra kho báu - FishingSuccess: " .. tostring(fishingSuccess) .. " | Level: " .. currentPlayerLevel)
+    
+    local willShowTreasure = false
+    if fishingSuccess and currentPlayerLevel >= 3 then
+        local treasureChance = math.random(1, 100)
+        print("🎲 [DEBUG] Treasure chance roll: " .. treasureChance .. "/100")
+        if treasureChance <= 90 then
+            print("🎁 [DEBUG] ✅ Kích hoạt minigame kho báu cho player: " .. src)
+            willShowTreasure = true
+            -- Delay 3 giây để người chơi thấy kết quả câu tôm trước
+            Citizen.SetTimeout(3000, function()
+                print("🎁 [DEBUG] Gửi event showTreasureAfterGame đến player: " .. src)
+                TriggerClientEvent('tomtich:showTreasureAfterGame', src)
+            end)
+        else
+            print("🎲 [DEBUG] ❌ Không trúng kho báu lần này")
+        end
     else
-        print('Túi đồ đã đầy')
+        print("🔍 [DEBUG] Không đủ điều kiện kho báu (Success: " .. tostring(fishingSuccess) .. ", Level: " .. currentPlayerLevel .. ")")
     end
+    
+    -- Nếu không có kho báu, đóng UI sau 3 giây
+    if not willShowTreasure then
+        TriggerClientEvent('tomtich:closeUI', src)
+    end
+    
+    -- Thông báo nếu túi đầy
+    if not addItemSuccess then
+        print('⚠️ [DEBUG] Không thể thêm item - Có thể túi đồ đầy hoặc lỗi ox_inventory')
+        TriggerClientEvent('cautomtich:notification', src, nil, "⚠️ Không thể nhận vật phẩm!")
+    end
+    
+    activeTomTichGames[src] = nil
 end)
 
 AddEventHandler('playerDropped', function()

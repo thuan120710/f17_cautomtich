@@ -965,6 +965,11 @@ const app = createApp({
                     customMessage: (!success && message) ? message : null
                 })
             });
+
+            // KHÔNG tự động đóng UI - để server quyết định (có thể mở kho báu)
+            // setTimeout(() => {
+            //     closeGameUI();
+            // }, 3000);
         };
 
         const getParentResourceName = () => 'f17_cautomtich';
