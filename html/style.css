@@ -1446,6 +1446,8 @@ body {
     animation: warningPulse 0.8s ease-in-out;
     z-index: 20;
     box-shadow: 0 0 20px rgba(255, 50, 50, 0.8);
+    white-space: nowrap; /* Không cho text xuống dòng */
+    display: inline-block;
 }
 
 @keyframes warningPulse {

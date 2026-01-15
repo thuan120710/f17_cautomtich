@@ -1,25 +1,37 @@
--- Điểm câu tôm tích
-local TOMTICH_POINT = vector3(-1903.75, -827.08, 0.56)
-
--- Điểm đào kho báu (Level 3 only)
-local TREASURE_POINT = vector4(-1525.51, -1269.09, 2.09, 220.49)
+-- Các điểm câu tôm tích
+local TOMTICH_POINTS = {
+    vector3(-1903.75, -827.08, 0.56),
+    vector3(-1854.1, -881.53, 1.38),
+    vector3(-1861.53, -868.48, 1.67),
+    vector3(-1869.86, -861.71, 1.31),
+    vector3(-1877.67, -854.82, 1.02),
+    vector3(-1887.46, -841.93, 1.1),
+    vector3(-1899.26, -831.63, 0.67),
+    vector3(-1906.17, -819.22, 1.11),
+    vector3(-1915.38, -808.02, 1.1),
+    vector3(-1925.53, -792.46, 1.16),
+    vector3(-1941.22, -779.2, 0.49),
+    vector3(-1944.33, -768.25, 1.14),
+    vector3(-1956.03, -758.74, 0.77)
+}
 
 local SPAWN_COOLDOWN = 5  -- 5 giây (Test)
 local INTERACTION_DISTANCE = 2.0  -- Khoảng cách tương tác
 
 -- Trạng thái minigame tôm tích
 local isTomTichActive = false
-local tomtichState = {
-    available = true,
-    lastUsed = 0
-}
+local tomtichStates = {} -- Cooldown riêng cho từng điểm
+
+-- Khởi tạo state cho từng điểm
+for i = 1, #TOMTICH_POINTS do
+    tomtichStates[i] = {
+        available = true,
+        lastUsed = 0
+    }
+end
 
 -- Trạng thái minigame kho báu
 local isTreasureActive = false
-local treasureState = {
-    available = true,
-    lastUsed = 0
-}
 
 -- Player level
 local playerLevel = 1
@@ -97,14 +109,23 @@ local function PlayFishingAnimation()
 end
 
 -- Mở UI tôm tích
-function OpenTomTichGame()
+local currentPointIndex = nil -- Lưu điểm đang sử dụng
+
+function OpenTomTichGame(pointIndex)
     if isTomTichActive then
         return
     end
     
+    -- Lưu index của điểm đang dùng
+    currentPointIndex = pointIndex
+    
     isTomTichActive = true
-    tomtichState.available = false
-    tomtichState.lastUsed = GetGameTimer() / 1000
+    
+    -- Chỉ set cooldown cho điểm này
+    if pointIndex then
+        tomtichStates[pointIndex].available = false
+        tomtichStates[pointIndex].lastUsed = GetGameTimer() / 1000
+    end
     
     PlayFishingAnimation()
     
@@ -207,24 +228,9 @@ function OpenTreasureGame(skipCooldown)
         return
     end
     
-    -- Bỏ check level để test
-    -- if playerLevel < 3 then
-    --     TriggerEvent('cautomtich:notification', nil, "Cần Level 3 để mở kho báu!")
-    --     return
-    -- end
-    
-    print("🎁 [CLIENT DEBUG] OpenTreasureGame được gọi - skipCooldown: " .. tostring(skipCooldown))
+    print("🎁 [CLIENT DEBUG] OpenTreasureGame được gọi")
     
     isTreasureActive = true
-    
-    -- Chỉ set cooldown nếu KHÔNG skip (tức là mở từ marker)
-    if not skipCooldown then
-        treasureState.available = false
-        treasureState.lastUsed = GetGameTimer() / 1000
-        print("🕐 [CLIENT DEBUG] Set cooldown cho treasure")
-    else
-        print("⏭️ [CLIENT DEBUG] Skip cooldown (mở từ event)")
-    end
     
     TriggerServerEvent('treasure:startGame')
     
@@ -292,17 +298,13 @@ Citizen.CreateThread(function()
         
         local currentTime = GetGameTimer() / 1000
         
-        if not tomtichState.available then
-            local timeSinceUsed = currentTime - tomtichState.lastUsed
-            if timeSinceUsed >= SPAWN_COOLDOWN then
-                tomtichState.available = true
-            end
-        end
-        
-        if not treasureState.available then
-            local timeSinceUsed = currentTime - treasureState.lastUsed
-            if timeSinceUsed >= SPAWN_COOLDOWN then
-                treasureState.available = true
+        -- Kiểm tra cooldown cho từng điểm
+        for i, state in ipairs(tomtichStates) do
+            if not state.available then
+                local timeSinceUsed = currentTime - state.lastUsed
+                if timeSinceUsed >= SPAWN_COOLDOWN then
+                    state.available = true
+                end
             end
         end
     end
@@ -315,116 +317,58 @@ Citizen.CreateThread(function()
         
         local playerPed = PlayerPedId()
         local playerCoords = GetEntityCoords(playerPed)
-        local distance = #(playerCoords - TOMTICH_POINT)
         
-        if distance < 50.0 then
-            sleep = 0
+        -- Lặp qua tất cả các điểm câu tôm
+        for i, point in ipairs(TOMTICH_POINTS) do
+            local distance = #(playerCoords - point)
+            local state = tomtichStates[i]
             
-            if tomtichState.available then
-                -- Marker xanh lá (available)
-                DrawMarker(
-                    1,
-                    TOMTICH_POINT.x, TOMTICH_POINT.y, TOMTICH_POINT.z - 1.0,
-                    0.0, 0.0, 0.0,
-                    0.0, 0.0, 0.0,
-                    1.5, 1.5, 1.0,
-                    0, 255, 150, 150,
-                    false, true, 2, false, nil, nil, false
-                )
+            if distance < 50.0 then
+                sleep = 0
                 
-                if distance < INTERACTION_DISTANCE then
-                    DrawText3D(TOMTICH_POINT.x, TOMTICH_POINT.y, TOMTICH_POINT.z + 0.5, "[~g~E~w~] Câu Tôm Tích")
+                if state.available then
+                    -- Marker xanh lá (available)
+                    DrawMarker(
+                        1,
+                        point.x, point.y, point.z - 1.0,
+                        0.0, 0.0, 0.0,
+                        0.0, 0.0, 0.0,
+                        1.5, 1.5, 1.0,
+                        0, 255, 150, 150,
+                        false, true, 2, false, nil, nil, false
+                    )
                     
-                    if IsControlJustReleased(0, 38) then
-                        OpenTomTichGame()
+                    if distance < INTERACTION_DISTANCE then
+                        DrawText3D(point.x, point.y, point.z + 0.5, "[~g~E~w~] Câu Tôm Tích")
+                        
+                        if IsControlJustReleased(0, 38) then
+                            OpenTomTichGame(i) -- Truyền index của điểm
+                        end
                     end
-                end
-            else
-                -- Marker đỏ (cooldown)
-                DrawMarker(
-                    1,
-                    TOMTICH_POINT.x, TOMTICH_POINT.y, TOMTICH_POINT.z - 1.0,
-                    0.0, 0.0, 0.0,
-                    0.0, 0.0, 0.0,
-                    1.5, 1.5, 1.0,
-                    255, 0, 0, 150,
-                    false, true, 2, false, nil, nil, false
-                )
-                
-                if distance < INTERACTION_DISTANCE then
-                    local currentTime = GetGameTimer() / 1000
-                    local timeSinceUsed = currentTime - tomtichState.lastUsed
-                    local remainingTime = math.ceil(SPAWN_COOLDOWN - timeSinceUsed)
-                    local minutes = math.floor(remainingTime / 60)
-                    local seconds = remainingTime % 60
+                else
+                    -- Marker đỏ (cooldown)
+                    DrawMarker(
+                        1,
+                        point.x, point.y, point.z - 1.0,
+                        0.0, 0.0, 0.0,
+                        0.0, 0.0, 0.0,
+                        1.5, 1.5, 1.0,
+                        255, 0, 0, 150,
+                        false, true, 2, false, nil, nil, false
+                    )
                     
-                    DrawText3D(TOMTICH_POINT.x, TOMTICH_POINT.y, TOMTICH_POINT.z + 0.5, string.format("~r~Đang hồi: %dm %ds", minutes, seconds))
+                    if distance < INTERACTION_DISTANCE then
+                        local currentTime = GetGameTimer() / 1000
+                        local timeSinceUsed = currentTime - state.lastUsed
+                        local remainingTime = math.ceil(SPAWN_COOLDOWN - timeSinceUsed)
+                        local minutes = math.floor(remainingTime / 60)
+                        local seconds = remainingTime % 60
+                        
+                        DrawText3D(point.x, point.y, point.z + 0.5, string.format("~r~Đang hồi: %dm %ds", minutes, seconds))
+                    end
                 end
             end
         end
-        
-        Citizen.Wait(sleep)
-    end
-end)
-
--- Thread hiển thị marker kho báu (Level 3 only)
-Citizen.CreateThread(function()
-    while true do
-        local sleep = 500
-        
-        -- Bỏ check level để test - luôn hiển thị marker
-        -- if playerLevel >= 3 then
-        local playerPed = PlayerPedId()
-        local playerCoords = GetEntityCoords(playerPed)
-        local treasureCoords = vector3(TREASURE_POINT.x, TREASURE_POINT.y, TREASURE_POINT.z)
-        local distance = #(playerCoords - treasureCoords)
-        
-        if distance < 50.0 then
-            sleep = 0
-            
-            if treasureState.available then
-                -- Marker vàng (available)
-                DrawMarker(
-                    1,
-                    TREASURE_POINT.x, TREASURE_POINT.y, TREASURE_POINT.z - 1.0,
-                    0.0, 0.0, 0.0,
-                    0.0, 0.0, 0.0,
-                    1.5, 1.5, 1.0,
-                    255, 204, 0, 150,
-                    false, true, 2, false, nil, nil, false
-                )
-                
-                if distance < INTERACTION_DISTANCE then
-                    DrawText3D(TREASURE_POINT.x, TREASURE_POINT.y, TREASURE_POINT.z + 0.5, "[~y~E~w~] Đào Kho Báu")
-                    
-                    if IsControlJustReleased(0, 38) then
-                        OpenTreasureGame()
-                    end
-                end
-            else
-                -- Marker đỏ (cooldown)
-                DrawMarker(
-                    1,
-                    TREASURE_POINT.x, TREASURE_POINT.y, TREASURE_POINT.z - 1.0,
-                    0.0, 0.0, 0.0,
-                    0.0, 0.0, 0.0,
-                    1.5, 1.5, 1.0,
-                    255, 0, 0, 150,
-                    false, true, 2, false, nil, nil, false
-                )
-                
-                if distance < INTERACTION_DISTANCE then
-                    local currentTime = GetGameTimer() / 1000
-                    local timeSinceUsed = currentTime - treasureState.lastUsed
-                    local remainingTime = math.ceil(SPAWN_COOLDOWN - timeSinceUsed)
-                    local minutes = math.floor(remainingTime / 60)
-                    local seconds = remainingTime % 60
-                    
-                    DrawText3D(TREASURE_POINT.x, TREASURE_POINT.y, TREASURE_POINT.z + 0.5, string.format("~r~Đang hồi: %dm %ds", minutes, seconds))
-                end
-            end
-        end
-        -- end -- Bỏ end này để luôn chạy
         
         Citizen.Wait(sleep)
     end
