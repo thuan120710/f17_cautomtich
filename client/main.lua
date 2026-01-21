@@ -1,22 +1,7 @@
--- Các điểm câu tôm tích
-local TOMTICH_POINTS = {
-    vector3(-1903.75, -827.08, 0.56),
-    vector3(-1854.1, -881.53, 1.38),
-    vector3(-1861.53, -868.48, 1.67),
-    vector3(-1869.86, -861.71, 1.31),
-    vector3(-1877.67, -854.82, 1.02),
-    vector3(-1887.46, -841.93, 1.1),
-    vector3(-1899.26, -831.63, 0.67),
-    vector3(-1906.17, -819.22, 1.11),
-    vector3(-1915.38, -808.02, 1.1),
-    vector3(-1925.53, -792.46, 1.16),
-    vector3(-1941.22, -779.2, 0.49),
-    vector3(-1944.33, -768.25, 1.14),
-    vector3(-1956.03, -758.74, 0.77)
-}
-
-local SPAWN_COOLDOWN = 5  -- 5 giây (Test)
-local INTERACTION_DISTANCE = 2.0  -- Khoảng cách tương tác
+-- Lấy config từ file config.lua
+local TOMTICH_POINTS = Config.TomTichPoints
+local SPAWN_COOLDOWN = Config.SpawnCooldown
+local INTERACTION_DISTANCE = Config.InteractionDistance
 
 -- Trạng thái minigame tôm tích
 local isTomTichActive = false
@@ -100,12 +85,12 @@ end
 local function PlayFishingAnimation()
     local playerPed = PlayerPedId()
     
-    RequestAnimDict("amb@world_human_stand_fishing@idle_a")
-    while not HasAnimDictLoaded("amb@world_human_stand_fishing@idle_a") do
+    RequestAnimDict(Config.Animation.dict)
+    while not HasAnimDictLoaded(Config.Animation.dict) do
         Citizen.Wait(100)
     end
     
-    TaskPlayAnim(playerPed, "amb@world_human_stand_fishing@idle_a", "idle_c", 8.0, -8.0, -1, 49, 0, false, false, false)
+    TaskPlayAnim(playerPed, Config.Animation.dict, Config.Animation.name, 8.0, -8.0, -1, 49, 0, false, false, false)
 end
 
 -- Mở UI tôm tích
@@ -323,37 +308,39 @@ Citizen.CreateThread(function()
             local distance = #(playerCoords - point)
             local state = tomtichStates[i]
             
-            if distance < 50.0 then
+            if distance < Config.MarkerDrawDistance then
                 sleep = 0
                 
                 if state.available then
-                    -- Marker xanh lá (available)
+                    -- Marker available
+                    local marker = Config.Marker.Available
                     DrawMarker(
-                        1,
+                        marker.type,
                         point.x, point.y, point.z - 1.0,
                         0.0, 0.0, 0.0,
                         0.0, 0.0, 0.0,
-                        1.5, 1.5, 1.0,
-                        0, 255, 150, 150,
+                        marker.size.x, marker.size.y, marker.size.z,
+                        marker.color.r, marker.color.g, marker.color.b, marker.color.a,
                         false, true, 2, false, nil, nil, false
                     )
                     
                     if distance < INTERACTION_DISTANCE then
-                        DrawText3D(point.x, point.y, point.z + 0.5, "[~g~E~w~] Câu Tôm Tích")
+                        DrawText3D(point.x, point.y, point.z + 0.5, marker.text)
                         
                         if IsControlJustReleased(0, 38) then
-                            OpenTomTichGame(i) -- Truyền index của điểm
+                            OpenTomTichGame(i)
                         end
                     end
                 else
-                    -- Marker đỏ (cooldown)
+                    -- Marker cooldown
+                    local marker = Config.Marker.Cooldown
                     DrawMarker(
-                        1,
+                        marker.type,
                         point.x, point.y, point.z - 1.0,
                         0.0, 0.0, 0.0,
                         0.0, 0.0, 0.0,
-                        1.5, 1.5, 1.0,
-                        255, 0, 0, 150,
+                        marker.size.x, marker.size.y, marker.size.z,
+                        marker.color.r, marker.color.g, marker.color.b, marker.color.a,
                         false, true, 2, false, nil, nil, false
                     )
                     

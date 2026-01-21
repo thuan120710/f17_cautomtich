@@ -1,58 +1,11 @@
-local ITEMS = {
-    TRASH = "racthainhua",
-    COMMON = "tomtich",         -- Tôm tích thường
-    UNCOMMON = "tomtichxanh",  -- Tôm tích xanh
-    RARE = "tomtichdo",        -- Tôm tích đỏ
-    LEGENDARY = "tomtichhoangkim", -- Tôm tích hoàng kim
-    TREASURE = "khobau"        -- Kho báu (từ mini game)
-}
+-- Lấy config từ file config.lua
+local ITEMS = Config.Items
+local LEVEL_CONFIG = Config.LevelConfig
+local EXP_REWARDS = Config.ExpRewards
 
 -- Hệ thống Level
 local playerLevels = {} -- {[playerId] = level}
 local playerExperience = {} -- {[playerId] = exp}
-
--- Cấu hình Level
-local LEVEL_CONFIG = {
-    [1] = {
-        expRequired = 0,
-        rates = {
-            [ITEMS.COMMON] = 60,
-            [ITEMS.UNCOMMON] = 35,
-            [ITEMS.RARE] = 5,
-            [ITEMS.LEGENDARY] = 0,
-            treasure = 0  -- Không có kho báu ở level 1
-        }
-    },
-    [2] = {
-        expRequired = 50, -- Cần 50 exp để lên level 2 (1 ván)
-        rates = {
-            [ITEMS.COMMON] = 45,
-            [ITEMS.UNCOMMON] = 40,
-            [ITEMS.RARE] = 10,
-            [ITEMS.LEGENDARY] = 5,
-            treasure = 0  -- Không có kho báu ở level 2
-        }
-    },
-    [3] = {
-        expRequired = 100, -- Cần 100 exp để lên level 3 (2 ván)
-        rates = {
-            [ITEMS.COMMON] = 40,
-            [ITEMS.UNCOMMON] = 30,
-            [ITEMS.RARE] = 15,
-            [ITEMS.LEGENDARY] = 10,
-            treasure = 5  -- 5% cơ hội kho báu ở level 3
-        }
-    }
-}
-
--- Exp nhận được khi câu tôm - Tăng lên để nhanh lên level
-local EXP_REWARDS = {
-    [ITEMS.COMMON] = 50,      -- Tăng từ 5 lên 50
-    [ITEMS.UNCOMMON] = 50,    -- Tăng từ 10 lên 50
-    [ITEMS.RARE] = 50,        -- Tăng từ 20 lên 50
-    [ITEMS.LEGENDARY] = 50,   -- Tăng từ 50 lên 50
-    [ITEMS.TREASURE] = 100
-}
 
 -- Hàm lấy level của người chơi
 local function GetPlayerLevel(playerId)
@@ -119,8 +72,8 @@ AddEventHandler('tomtich:startGame', function()
     local src = source
     
     -- 🔒 RATE LIMITING - Chống spam
-    if playerCooldowns[src] and os.time() - playerCooldowns[src] < 10 then
-        TriggerClientEvent('cautomtich:notification', src, nil, "⏱️ Chờ 10 giây trước khi chơi lại!")
+    if playerCooldowns[src] and os.time() - playerCooldowns[src] < Config.AntiSpam.cooldown then
+        TriggerClientEvent('cautomtich:notification', src, nil, "⏱️ Chờ " .. Config.AntiSpam.cooldown .. " giây trước khi chơi lại!")
         return
     end
     
@@ -152,11 +105,11 @@ AddEventHandler('tomtich:attempt', function(success, itemCode, customMessage)
         return 
     end
     
-    -- 🔒 KIỂM TRA THỜI GIAN - Chống cheat (game tối thiểu 15 giây)
+    -- 🔒 KIỂM TRA THỜI GIAN - Chống cheat (game tối thiểu theo config)
     local currentTime = os.time()
     local gameDuration = currentTime - game.startTime
     
-    if gameDuration < 15 then
+    if gameDuration < Config.AntiSpam.minGameDuration then
         print("⚠️ [ANTI-CHEAT] Player " .. src .. " hoàn thành game quá nhanh (" .. gameDuration .. "s)")
         TriggerClientEvent('cautomtich:notification', src, nil, "⚠️ Phát hiện hành vi bất thường!")
         activeTomTichGames[src] = nil
@@ -212,15 +165,14 @@ AddEventHandler('tomtich:attempt', function(success, itemCode, customMessage)
     TriggerClientEvent('tomtich:gameResult', src, fishingSuccess, item)
     TriggerClientEvent('cautomtich:notification', src, item, reason)
     
-    -- Kiểm tra level 3 và câu thành công -> 90% cơ hội hiển thị kho báu
-    -- QUAN TRỌNG: Kiểm tra BẤT KỂ AddItem thành công hay không
+    -- Kiểm tra level và câu thành công -> cơ hội hiển thị kho báu
     print("🔍 [DEBUG] Kiểm tra kho báu - FishingSuccess: " .. tostring(fishingSuccess) .. " | Level: " .. currentPlayerLevel)
     
     local willShowTreasure = false
-    if fishingSuccess and currentPlayerLevel >= 3 then
+    if fishingSuccess and currentPlayerLevel >= Config.Treasure.minLevelRequired then
         local treasureChance = math.random(1, 100)
         print("🎲 [DEBUG] Treasure chance roll: " .. treasureChance .. "/100")
-        if treasureChance <= 90 then
+        if treasureChance <= Config.Treasure.treasureChance then
             print("🎁 [DEBUG] ✅ Kích hoạt minigame kho báu cho player: " .. src)
             willShowTreasure = true
             -- Delay 3 giây để người chơi thấy kết quả câu tôm trước
@@ -266,15 +218,18 @@ RegisterNetEvent('treasure:startGame')
 AddEventHandler('treasure:startGame', function()
     local src = source
     
-    -- Generate treasure positions (2 treasures in 5x5 grid)
-    -- Ensure they are not too close to each other (at least 2 cells apart)
+    local gridSize = Config.Treasure.gridSize
+    local treasureCount = Config.Treasure.treasureCount
+    local minDistance = Config.Treasure.minDistance
+    
+    -- Generate treasure positions
     local treasurePositions = {}
     local maxAttempts = 100
     local attempts = 0
     
-    while #treasurePositions < 2 and attempts < maxAttempts do
+    while #treasurePositions < treasureCount and attempts < maxAttempts do
         attempts = attempts + 1
-        local pos = math.random(0, 24) -- 0-24 for 5x5 grid
+        local pos = math.random(0, (gridSize * gridSize) - 1)
         
         -- Check if position already exists
         local exists = false
@@ -289,15 +244,15 @@ AddEventHandler('treasure:startGame', function()
             -- If this is the second treasure, check distance from first
             if #treasurePositions == 1 then
                 local firstPos = treasurePositions[1]
-                local row1 = math.floor(firstPos / 5)
-                local col1 = firstPos % 5
-                local row2 = math.floor(pos / 5)
-                local col2 = pos % 5
+                local row1 = math.floor(firstPos / gridSize)
+                local col1 = firstPos % gridSize
+                local row2 = math.floor(pos / gridSize)
+                local col2 = pos % gridSize
                 
-                -- Manhattan distance (at least 3 cells apart for better difficulty)
+                -- Manhattan distance
                 local distance = math.abs(row1 - row2) + math.abs(col1 - col2)
                 
-                if distance >= 3 then
+                if distance >= minDistance then
                     table.insert(treasurePositions, pos)
                 end
             else
@@ -308,7 +263,7 @@ AddEventHandler('treasure:startGame', function()
     end
     
     -- Fallback if couldn't find good positions
-    if #treasurePositions < 2 then
+    if #treasurePositions < treasureCount then
         treasurePositions = {math.random(0, 11), math.random(13, 24)}
     end
     
@@ -316,13 +271,13 @@ AddEventHandler('treasure:startGame', function()
         active = true,
         treasures = treasurePositions,
         foundTreasures = {},
-        attempts = 4,
+        attempts = Config.Treasure.initialAttempts,
         openedCells = {}
     }
     
     -- Send game data to client
     TriggerClientEvent('treasure:gameData', src, {
-        attempts = 4
+        attempts = Config.Treasure.initialAttempts
     })
 end)
 
@@ -363,15 +318,15 @@ AddEventHandler('treasure:openCell', function(cellIndex)
         })
         
         -- Check win condition
-        if #game.foundTreasures >= 2 then
+        if #game.foundTreasures >= Config.Treasure.treasureCount then
             -- WIN!
             TriggerClientEvent('treasure:gameEnd', src, {
                 success = true,
                 treasures = game.treasures
             })
             
-            ox:AddItem(src, ITEMS.TREASURE, 2)           
-            TriggerClientEvent('cautomtich:notification', src, ITEMS.TREASURE, "🎉 Chúc mừng! Bạn đã tìm được 2 kho báu!")
+            ox:AddItem(src, ITEMS.TREASURE, Config.Treasure.rewardAmount)           
+            TriggerClientEvent('cautomtich:notification', src, ITEMS.TREASURE, "🎉 Chúc mừng! Bạn đã tìm được " .. Config.Treasure.treasureCount .. " kho báu!")
             
             activeTreasureGames[src] = nil
         end
@@ -390,7 +345,7 @@ AddEventHandler('treasure:openCell', function(cellIndex)
         })
         
         -- Check lose condition
-        if game.attempts <= 0 and #game.foundTreasures < 2 then
+        if game.attempts <= 0 and #game.foundTreasures < Config.Treasure.treasureCount then
             -- LOSE!
             TriggerClientEvent('treasure:gameEnd', src, {
                 success = false,
@@ -406,9 +361,11 @@ end)
 
 -- Generate smart hint
 function generateHint(cellIndex, treasures, foundTreasures)
+    local gridSize = Config.Treasure.gridSize
+    
     -- Convert index to row, col
-    local row = math.floor(cellIndex / 5)
-    local col = cellIndex % 5
+    local row = math.floor(cellIndex / gridSize)
+    local col = cellIndex % gridSize
     
     -- Find closest unfound treasure
     local closestTreasure = nil
@@ -424,8 +381,8 @@ function generateHint(cellIndex, treasures, foundTreasures)
         end
         
         if not alreadyFound then
-            local tRow = math.floor(treasurePos / 5)
-            local tCol = treasurePos % 5
+            local tRow = math.floor(treasurePos / Config.Treasure.gridSize)
+            local tCol = treasurePos % Config.Treasure.gridSize
             local distance = math.abs(row - tRow) + math.abs(col - tCol)
             
             if distance < minDistance then
@@ -439,8 +396,8 @@ function generateHint(cellIndex, treasures, foundTreasures)
         return "Không còn kho báu nào!"
     end
     
-    local tRow = math.floor(closestTreasure / 5)
-    local tCol = closestTreasure % 5
+    local tRow = math.floor(closestTreasure / Config.Treasure.gridSize)
+    local tCol = closestTreasure % Config.Treasure.gridSize
     
     local rowDiff = tRow - row
     local colDiff = tCol - col
