@@ -66,6 +66,7 @@ end
 
 local activeTomTichGames = {}
 local playerCooldowns = {} -- Anti-spam
+local playerTreasureHistory = {} -- Lưu lịch sử xuất hiện kho báu {[playerId] = {timestamp1, timestamp2, ...}}
 
 RegisterNetEvent('tomtich:startGame')
 AddEventHandler('tomtich:startGame', function()
@@ -170,18 +171,45 @@ AddEventHandler('tomtich:attempt', function(success, itemCode, customMessage)
     
     local willShowTreasure = false
     if fishingSuccess and currentPlayerLevel >= Config.Treasure.minLevelRequired then
-        local treasureChance = math.random(1, 100)
-        print("🎲 [DEBUG] Treasure chance roll: " .. treasureChance .. "/100")
-        if treasureChance <= Config.Treasure.treasureChance then
-            print("🎁 [DEBUG] ✅ Kích hoạt minigame kho báu cho player: " .. src)
-            willShowTreasure = true
-            -- Delay 3 giây để người chơi thấy kết quả câu tôm trước
-            Citizen.SetTimeout(3000, function()
-                print("🎁 [DEBUG] Gửi event showTreasureAfterGame đến player: " .. src)
-                TriggerClientEvent('tomtich:showTreasureAfterGame', src)
-            end)
+        -- Kiểm tra giới hạn 2 rương/giờ
+        local currentTime = os.time()
+        if not playerTreasureHistory[src] then
+            playerTreasureHistory[src] = {}
+        end
+        
+        -- Lọc bỏ các lần xuất hiện kho báu cũ hơn 1 giờ
+        local recentTreasures = {}
+        for _, timestamp in ipairs(playerTreasureHistory[src]) do
+            if currentTime - timestamp < Config.Treasure.hourWindow then
+                table.insert(recentTreasures, timestamp)
+            end
+        end
+        playerTreasureHistory[src] = recentTreasures
+        
+        -- Kiểm tra số lượng kho báu trong 1 giờ qua
+        local treasureCount = #playerTreasureHistory[src]
+        print("🎲 [DEBUG] Số kho báu đã xuất hiện trong 1h: " .. treasureCount .. "/" .. Config.Treasure.maxPerHour)
+        
+        if treasureCount >= Config.Treasure.maxPerHour then
+            print("⏱️ [DEBUG] ❌ Đã đạt giới hạn " .. Config.Treasure.maxPerHour .. " kho báu/giờ")
         else
-            print("🎲 [DEBUG] ❌ Không trúng kho báu lần này")
+            local treasureChance = math.random(1, 100)
+            print("🎲 [DEBUG] Treasure chance roll: " .. treasureChance .. "/100")
+            if treasureChance <= Config.Treasure.treasureChance then
+                print("🎁 [DEBUG] ✅ Kích hoạt minigame kho báu cho player: " .. src)
+                willShowTreasure = true
+                
+                -- Lưu timestamp xuất hiện kho báu
+                table.insert(playerTreasureHistory[src], currentTime)
+                
+                -- Delay 3 giây để người chơi thấy kết quả câu tôm trước
+                Citizen.SetTimeout(3000, function()
+                    print("🎁 [DEBUG] Gửi event showTreasureAfterGame đến player: " .. src)
+                    TriggerClientEvent('tomtich:showTreasureAfterGame', src)
+                end)
+            else
+                print("🎲 [DEBUG] ❌ Không trúng kho báu lần này")
+            end
         end
     else
         print("🔍 [DEBUG] Không đủ điều kiện kho báu (Success: " .. tostring(fishingSuccess) .. ", Level: " .. currentPlayerLevel .. ")")

@@ -67,31 +67,28 @@ Config.LevelConfig = {
     [1] = {
         expRequired = 0,
         rates = {
-            [Config.Items.COMMON] = 60,
-            [Config.Items.UNCOMMON] = 35,
-            [Config.Items.RARE] = 5,
-            [Config.Items.LEGENDARY] = 0,
-            treasure = 0
+            [Config.Items.COMMON] = 60,      -- Tôm thường: 60%
+            [Config.Items.UNCOMMON] = 40,    -- Tôm xanh: 40%
+            [Config.Items.RARE] = 0,
+            [Config.Items.LEGENDARY] = 0
         }
     },
     [2] = {
         expRequired = 50,
         rates = {
-            [Config.Items.COMMON] = 45,
-            [Config.Items.UNCOMMON] = 40,
-            [Config.Items.RARE] = 10,
-            [Config.Items.LEGENDARY] = 5,
-            treasure = 0
+            [Config.Items.COMMON] = 20,      -- Tôm thường: 20%
+            [Config.Items.UNCOMMON] = 40,    -- Tôm xanh: 40%
+            [Config.Items.RARE] = 40,        -- Tôm đỏ: 40%
+            [Config.Items.LEGENDARY] = 0
         }
     },
     [3] = {
         expRequired = 100,
         rates = {
-            [Config.Items.COMMON] = 40,
-            [Config.Items.UNCOMMON] = 30,
-            [Config.Items.RARE] = 15,
-            [Config.Items.LEGENDARY] = 10,
-            treasure = 5
+            [Config.Items.COMMON] = 25,      -- Tôm thường: 25%
+            [Config.Items.UNCOMMON] = 35,    -- Tôm xanh: 35%
+            [Config.Items.RARE] = 30,        -- Tôm đỏ: 30%
+            [Config.Items.LEGENDARY] = 10    -- Tôm vàng: 10%
         }
     }
 }
@@ -123,9 +120,11 @@ Config.Treasure = {
     treasureCount = 2, -- Số lượng kho báu cần tìm
     initialAttempts = 4, -- Số lượt đào ban đầu
     minDistance = 3, -- Khoảng cách tối thiểu giữa 2 kho báu
-    treasureChance = 90, -- Tỷ lệ xuất hiện kho báu ở level 3 (%)
+    treasureChance = 100, -- Tỷ lệ xuất hiện kho báu (10%)
     minLevelRequired = 3, -- Level tối thiểu để có kho báu
-    rewardAmount = 2 -- Số lượng kho báu nhận được khi thắng
+    rewardAmount = 1, -- Số lượng kho báu nhận được khi thắng
+    maxPerHour = 2, -- Giới hạn tối đa 2 rương/giờ
+    hourWindow = 3600 -- 1 giờ = 3600 giây
 }
 
 -- ============================================
