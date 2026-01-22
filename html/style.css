@@ -22,8 +22,10 @@ body {
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
-    width: 26.25rem;
-    height: 43.75rem;
+    width: 85%;
+    max-width: 40.625rem;
+    height: auto;
+    aspect-ratio: 650 / 850;
     z-index: 10000;
     display: flex;
     flex-direction: column;
@@ -33,8 +35,8 @@ body {
     border-radius: 2.188rem;
     overflow: hidden;
     cursor: none;
-    border: 0.313rem solid #8b7355;
-    box-shadow: 0 0 3.125rem rgba(0, 0, 0, 0.9);
+    border: 0.6rem solid rgba(139, 115, 85, 0.6);
+    box-shadow: 0 1.25rem 3.75rem rgba(0, 0, 0, 0.5);
 }
 
 /* Header Bar - Like in image */
@@ -101,7 +103,7 @@ body {
 .tunnel-instruction-panel-outside {
     position: fixed;
     top: 50%;
-    left: calc(50% + 26.25rem / 2 + 0.938rem);
+    left: calc(50% + 40.625rem / 2 + 0.938rem);
     transform: translateY(-50%);
     color: white;
     pointer-events: none;
@@ -2006,6 +2008,16 @@ body {
     color: #d4770e;
     text-shadow: 0.125rem 0.125rem 0.25rem rgba(255, 255, 255, 0.5), 0 0 1.25rem rgba(212, 119, 14, 0.3);
     letter-spacing: 0.125rem;
+    display: flex;
+    align-items: center;
+    gap: 0.625rem;
+}
+
+.treasure-title-icon {
+    width: 2rem;
+    height: 2rem;
+    object-fit: contain;
+    filter: drop-shadow(0 0 0.5rem rgba(255, 215, 0, 0.6));
 }
 
 .treasure-close-btn {
@@ -2049,6 +2061,12 @@ body {
 
 .info-icon {
     font-size: 1.5rem;
+}
+
+.info-icon-img {
+    width: 1.5rem;
+    height: 1.5rem;
+    object-fit: contain;
 }
 
 .info-label {
@@ -2136,6 +2154,13 @@ body {
     box-shadow: inset 0 0.125rem 0.25rem rgba(255, 255, 255, 0.3);
 }
 
+.ruong-img {
+    width: 80%;
+    height: 80%;
+    object-fit: contain;
+    pointer-events: none;
+}
+
 .card-icon {
     font-size: 3rem;
     animation: cardFloat 2s ease-in-out infinite;
@@ -2211,6 +2236,16 @@ body {
     display: flex;
     align-items: center;
     justify-content: center;
+}
+
+.treasure-icon-img {
+    width: 80%;
+    height: 80%;
+    object-fit: contain;
+    animation: cardFloat 2s ease-in-out infinite;
+    filter: drop-shadow(0 0 0.938rem rgba(255, 215, 0, 0.9)) 
+            drop-shadow(0 0 1.563rem rgba(255, 193, 7, 0.7))
+            drop-shadow(0 0.25rem 0.5rem rgba(0, 0, 0, 0.3));
 }
 
 .treasure-icon img {

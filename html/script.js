@@ -1083,7 +1083,7 @@ const app = createApp({
             // Delay showing result popup to let cards flip
             setTimeout(() => {
                 if (data.success) {
-                    treasureResultMessage.value = '🎉 Chúc mừng! Bạn đã tìm được 2 kho báu!';
+                    treasureResultMessage.value = '🎉 Chúc mừng! Bạn đã nhận được kho báu!';
                     SOUNDS.win.play().catch(() => { });
                 } else {
                     treasureResultMessage.value = '😔 Hết lượt! Hãy thử lại lần sau.';

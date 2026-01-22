@@ -343,7 +343,7 @@
         <div v-if="treasureVisible" id="treasure-container">
             <div class="treasure-wrapper">
                 <div class="treasure-header">
-                    <div class="treasure-title">💎 ĐÀO KHO BÁU</div>
+                    <div class="treasure-title"><img src="images/seashell-clipart-original.png" class="treasure-title-icon" alt="Kho báu"> ĐÀO KHO BÁU</div>
                     <button @click="handleTreasureClose" class="treasure-close-btn">✖</button>
                 </div>
 
@@ -354,7 +354,7 @@
                         <span class="info-value">{{ treasureAttempts }}</span>
                     </div>
                     <div class="info-item">
-                        <span class="info-icon">💎</span>
+                        <img src="images/seashell-clipart-original.png" class="info-icon-img" alt="Kho báu">
                         <span class="info-label">Đã tìm:</span>
                         <span class="info-value">{{ treasureFound }}/2</span>
                     </div>
@@ -374,10 +374,10 @@
                         @click="openTreasureCell(index)"
                     >
                         <div class="cell-front">
-                            <span class="card-icon">🎴</span>
+                            <img src="images/ruong.png" alt="Rương" class="ruong-img">
                         </div>
                         <div class="cell-back">
-                            <span v-if="cell.isTreasure" class="treasure-icon">💎</span>
+                            <img v-if="cell.isTreasure" src="images/seashell-clipart-original.png" class="treasure-icon-img" alt="Kho báu">
                             <span v-else class="trash-icon">🗑️</span>
                         </div>
                     </div>

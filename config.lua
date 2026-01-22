@@ -18,23 +18,18 @@ Config.Items = {
 }
 
 -- ============================================
--- CẤU HÌNH ĐIỂM CÂU TÔM TÍCH
+-- CẤU HÌNH VÙNG CÂU TÔM TÍCH (HÌNH CHỮ NHẬT)
 -- ============================================
-Config.TomTichPoints = {
-    vector3(-1903.75, -827.08, 0.56),
-    vector3(-1854.1, -881.53, 1.38),
-    vector3(-1861.53, -868.48, 1.67),
-    vector3(-1869.86, -861.71, 1.31),
-    vector3(-1877.67, -854.82, 1.02),
-    vector3(-1887.46, -841.93, 1.1),
-    vector3(-1899.26, -831.63, 0.67),
-    vector3(-1906.17, -819.22, 1.11),
-    vector3(-1915.38, -808.02, 1.1),
-    vector3(-1925.53, -792.46, 1.16),
-    vector3(-1941.22, -779.2, 0.49),
-    vector3(-1944.33, -768.25, 1.14),
-    vector3(-1956.03, -758.74, 0.77)
+Config.TomTichZone = {
+    coords = vector3(-282.18, 6547.14, 2.59), -- Tọa độ trung tâm vùng
+    size = vector3(30.0, 25.0, 15), -- Kích thước (dài x rộng x cao/sâu)
+    rotation = 0 -- Góc xoay (0-360)
+    -- Lưu ý: 
+    -- - size.x = chiều dài (length)
+    -- - size.y = chiều rộng (width)
+    -- - size.z = chiều cao/sâu (height) - tăng lên nếu địa hình có độ cao thấp khác nhau
 }
+
 
 -- ============================================
 -- CẤU HÌNH THỜI GIAN & KHOẢNG CÁCH
@@ -133,4 +128,9 @@ Config.Treasure = {
 Config.Animation = {
     dict = "amb@world_human_stand_fishing@idle_a",
     name = "idle_c"
+}
+
+Config.DiggingAnimation = {
+    dict = "amb@world_human_gardener_plant@male@base",
+    name = "base"
 }

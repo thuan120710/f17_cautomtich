@@ -6,6 +6,7 @@ local EXP_REWARDS = Config.ExpRewards
 -- Hệ thống Level
 local playerLevels = {} -- {[playerId] = level}
 local playerExperience = {} -- {[playerId] = exp}
+local playerCooldownTimes = {} -- {[cid] = lastPlayTime} - Dùng CID để tránh reset khi outgame
 
 -- Hàm lấy level của người chơi
 local function GetPlayerLevel(playerId)
@@ -72,6 +73,22 @@ RegisterNetEvent('tomtich:startGame')
 AddEventHandler('tomtich:startGame', function()
     local src = source
     
+    -- Lấy CID của người chơi
+    local Player = QBCore.Functions.GetPlayer(src)
+    if not Player then return end
+    
+    local cid = Player.PlayerData.citizenid
+    local currentTime = os.time()
+    
+    -- Kiểm tra cooldown dựa trên CID (tránh reset khi outgame)
+    if playerCooldownTimes[cid] and currentTime - playerCooldownTimes[cid] < 180 then
+        local remainingTime = 180 - (currentTime - playerCooldownTimes[cid])
+        local minutes = math.floor(remainingTime / 60)
+        local seconds = remainingTime % 60
+        TriggerClientEvent('cautomtich:notification', src, nil, string.format("⏱️ Khu vực này không thấy tôm", minutes, seconds))
+        return
+    end
+    
     -- 🔒 RATE LIMITING - Chống spam
     if playerCooldowns[src] and os.time() - playerCooldowns[src] < Config.AntiSpam.cooldown then
         TriggerClientEvent('cautomtich:notification', src, nil, "⏱️ Chờ " .. Config.AntiSpam.cooldown .. " giây trước khi chơi lại!")
@@ -86,7 +103,8 @@ AddEventHandler('tomtich:startGame', function()
     activeTomTichGames[src] = {
         active = true,
         level = level,
-        startTime = os.time() -- 🔒 Lưu thời gian bắt đầu
+        startTime = os.time(), -- 🔒 Lưu thời gian bắt đầu
+        cid = cid -- Lưu CID
     }
     
     -- Gửi thông tin level về client
@@ -141,12 +159,8 @@ AddEventHandler('tomtich:attempt', function(success, itemCode, customMessage)
         local expGained = EXP_REWARDS[rewardItem] or 0
         local leveledUp, newLevel = AddExperience(src, expGained)
         
+        -- Cập nhật level sau khi level up (không cần thông báo ở đây vì đã có trong AddExperience)
         if leveledUp then
-            -- Thông báo level up
-            TriggerClientEvent('cautomtich:notification', src, nil, 
-                string.format("🎉 LEVEL UP! Bạn đã đạt Level %d!", newLevel))
-            
-            -- Cập nhật level sau khi level up
             currentPlayerLevel = newLevel
         end
         
@@ -154,6 +168,11 @@ AddEventHandler('tomtich:attempt', function(success, itemCode, customMessage)
         local currentExp = GetPlayerExp(src)
         local finalLevel = GetPlayerLevel(src)
         TriggerClientEvent('tomtich:updateLevel', src, finalLevel, currentExp)
+    end
+    
+    -- Lưu cooldown time theo CID
+    if game.cid then
+        playerCooldownTimes[game.cid] = os.time()
     end
     
     -- Thêm item vào inventory
@@ -354,7 +373,7 @@ AddEventHandler('treasure:openCell', function(cellIndex)
             })
             
             ox:AddItem(src, ITEMS.TREASURE, Config.Treasure.rewardAmount)           
-            TriggerClientEvent('cautomtich:notification', src, ITEMS.TREASURE, "🎉 Chúc mừng! Bạn đã tìm được " .. Config.Treasure.treasureCount .. " kho báu!")
+            TriggerClientEvent('cautomtich:notification', src, ITEMS.TREASURE, "🎉 Chúc mừng! Bạn đã nhận được kho báu!")
             
             activeTreasureGames[src] = nil
         end
