@@ -115,12 +115,9 @@ RegisterNetEvent('tomtich:attempt')
 AddEventHandler('tomtich:attempt', function(success, itemCode, customMessage)
     local src = source
     
-    print("🔍 [DEBUG] tomtich:attempt được gọi - Player: " .. src .. " | Success: " .. tostring(success))
-    
     local game = activeTomTichGames[src]
     
     if not game or not game.active then 
-        print("⚠️ [ANTI-CHEAT] Player " .. src .. " gửi kết quả không hợp lệ (game không tồn tại)")
         return 
     end
     
@@ -129,7 +126,6 @@ AddEventHandler('tomtich:attempt', function(success, itemCode, customMessage)
     local gameDuration = currentTime - game.startTime
     
     if gameDuration < Config.AntiSpam.minGameDuration then
-        print("⚠️ [ANTI-CHEAT] Player " .. src .. " hoàn thành game quá nhanh (" .. gameDuration .. "s)")
         TriggerClientEvent('cautomtich:notification', src, nil, "⚠️ Phát hiện hành vi bất thường!")
         activeTomTichGames[src] = nil
         return
@@ -142,9 +138,6 @@ AddEventHandler('tomtich:attempt', function(success, itemCode, customMessage)
     if success then
         -- Server tự random dựa trên level, KHÔNG dùng itemCode từ client
         rewardItem = GetRandomShrimpByLevel(game.level)
-        print("✅ [SERVER] Player " .. src .. " thành công - Tôm: " .. rewardItem)
-    else
-        print("❌ [SERVER] Player " .. src .. " thất bại")
     end
 
     local item = success and rewardItem or ITEMS.TRASH
@@ -176,18 +169,13 @@ AddEventHandler('tomtich:attempt', function(success, itemCode, customMessage)
     end
     
     -- Thêm item vào inventory
-    print("🎁 [DEBUG] Đang thêm item: " .. item .. " cho player: " .. src)
     local addItemSuccess = ox:AddItem(src, item, 1)
-    
-    print("🎁 [DEBUG] AddItem result: " .. tostring(addItemSuccess))
     
     -- Gửi kết quả về client
     TriggerClientEvent('tomtich:gameResult', src, fishingSuccess, item)
     TriggerClientEvent('cautomtich:notification', src, item, reason)
     
     -- Kiểm tra level và câu thành công -> cơ hội hiển thị kho báu
-    print("🔍 [DEBUG] Kiểm tra kho báu - FishingSuccess: " .. tostring(fishingSuccess) .. " | Level: " .. currentPlayerLevel)
-    
     local willShowTreasure = false
     if fishingSuccess and currentPlayerLevel >= Config.Treasure.minLevelRequired then
         -- Kiểm tra giới hạn 2 rương/giờ
@@ -207,15 +195,12 @@ AddEventHandler('tomtich:attempt', function(success, itemCode, customMessage)
         
         -- Kiểm tra số lượng kho báu trong 1 giờ qua
         local treasureCount = #playerTreasureHistory[src]
-        print("🎲 [DEBUG] Số kho báu đã xuất hiện trong 1h: " .. treasureCount .. "/" .. Config.Treasure.maxPerHour)
         
         if treasureCount >= Config.Treasure.maxPerHour then
-            print("⏱️ [DEBUG] ❌ Đã đạt giới hạn " .. Config.Treasure.maxPerHour .. " kho báu/giờ")
+            -- Đã đạt giới hạn
         else
             local treasureChance = math.random(1, 100)
-            print("🎲 [DEBUG] Treasure chance roll: " .. treasureChance .. "/100")
             if treasureChance <= Config.Treasure.treasureChance then
-                print("🎁 [DEBUG] ✅ Kích hoạt minigame kho báu cho player: " .. src)
                 willShowTreasure = true
                 
                 -- Lưu timestamp xuất hiện kho báu
@@ -223,15 +208,10 @@ AddEventHandler('tomtich:attempt', function(success, itemCode, customMessage)
                 
                 -- Delay 3 giây để người chơi thấy kết quả câu tôm trước
                 Citizen.SetTimeout(3000, function()
-                    print("🎁 [DEBUG] Gửi event showTreasureAfterGame đến player: " .. src)
                     TriggerClientEvent('tomtich:showTreasureAfterGame', src)
                 end)
-            else
-                print("🎲 [DEBUG] ❌ Không trúng kho báu lần này")
             end
         end
-    else
-        print("🔍 [DEBUG] Không đủ điều kiện kho báu (Success: " .. tostring(fishingSuccess) .. ", Level: " .. currentPlayerLevel .. ")")
     end
     
     -- Nếu không có kho báu, đóng UI sau 3 giây
@@ -241,7 +221,6 @@ AddEventHandler('tomtich:attempt', function(success, itemCode, customMessage)
     
     -- Thông báo nếu túi đầy
     if not addItemSuccess then
-        print('⚠️ [DEBUG] Không thể thêm item - Có thể túi đồ đầy hoặc lỗi ox_inventory')
         TriggerClientEvent('cautomtich:notification', src, nil, "⚠️ Không thể nhận vật phẩm!")
     end
     

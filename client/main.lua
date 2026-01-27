@@ -174,7 +174,6 @@ end, false)
 
 -- Command test trigger event kho báu
 RegisterCommand('testtreasureevent', function()
-    print("🧪 [TEST] Trigger event showTreasureAfterGame")
     TriggerEvent('tomtich:showTreasureAfterGame')
 end, false)
 
@@ -203,8 +202,6 @@ end)
 -- Nhận sự kiện hiển thị kho báu sau khi câu tôm thành công (Level 3)
 RegisterNetEvent('tomtich:showTreasureAfterGame')
 AddEventHandler('tomtich:showTreasureAfterGame', function()
-    print("🎁 [CLIENT DEBUG] Nhận event showTreasureAfterGame")
-    
     -- Đóng UI tôm tích trước
     CloseTomTichGame()
     
@@ -213,7 +210,6 @@ AddEventHandler('tomtich:showTreasureAfterGame', function()
     
     -- Delay 1 giây rồi mở minigame kho báu (SKIP COOLDOWN vì đây là reward)
     Citizen.SetTimeout(1000, function()
-        print("🎁 [CLIENT DEBUG] Mở minigame kho báu (skip cooldown)")
         OpenTreasureGame(true)  -- true = skip cooldown
     end)
 end)
@@ -238,33 +234,26 @@ end)
 
 function OpenTreasureGame(skipCooldown)
     if isTreasureActive then
-        print("⚠️ [CLIENT DEBUG] Kho báu đang active, không mở lại")
         return
     end
-    
-    print("🎁 [CLIENT DEBUG] OpenTreasureGame được gọi")
     
     isTreasureActive = true
     
     TriggerServerEvent('treasure:startGame')
     
-    print("🎁 [CLIENT DEBUG] Đang set NUI focus và gửi message showTreasure")
     SetNuiFocus(true, true)
     SendNUIMessage({
         action = "showTreasure"
     })
-    print("🎁 [CLIENT DEBUG] Đã gửi showTreasure message đến NUI")
 end
 
 function CloseTreasureGame()
-    print("🔒 [CLIENT DEBUG] CloseTreasureGame được gọi")
     isTreasureActive = false
     SetNuiFocus(false, false)
     SendNUIMessage({
         action = "hideTreasure"
     })
     TriggerServerEvent('treasure:close')
-    print("🔒 [CLIENT DEBUG] Treasure đã đóng - isTreasureActive: " .. tostring(isTreasureActive))
 end
 
 RegisterNUICallback('closeTreasure', function(data, cb)
