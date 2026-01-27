@@ -68,47 +68,93 @@ end
 local activeTomTichGames = {}
 local playerCooldowns = {} -- Anti-spam
 local playerTreasureHistory = {} -- Lưu lịch sử xuất hiện kho báu {[playerId] = {timestamp1, timestamp2, ...}}
+local playerDiggingSession = {} -- Lưu session đào cát {[src] = {cid, canOpenUI, timestamp}}
 
-RegisterNetEvent('tomtich:startGame')
-AddEventHandler('tomtich:startGame', function()
+-- ✅ Event 1: Kiểm tra cooldown KHI BẮT ĐẦU ĐÀO
+RegisterNetEvent('tomtich:checkCooldown')
+AddEventHandler('tomtich:checkCooldown', function()
     local src = source
     
-    -- Lấy CID của người chơi
     local Player = QBCore.Functions.GetPlayer(src)
     if not Player then return end
     
     local cid = Player.PlayerData.citizenid
     local currentTime = os.time()
     
-    -- Kiểm tra cooldown dựa trên CID (tránh reset khi outgame)
+    -- Kiểm tra cooldown
+    local canDig = true
     if playerCooldownTimes[cid] and currentTime - playerCooldownTimes[cid] < 180 then
-        local remainingTime = 180 - (currentTime - playerCooldownTimes[cid])
+        canDig = false
+    end
+    
+    -- Lưu session đào cát
+    playerDiggingSession[src] = {
+        cid = cid,
+        canOpenUI = canDig,
+        timestamp = currentTime
+    }
+    
+    -- ✅ Nếu OK thì LƯU COOLDOWN NGAY (từ lúc bắt đầu đào)
+    if canDig then
+        playerCooldownTimes[cid] = currentTime
+    end
+end)
+
+-- ✅ Event 2: Khi đào xong, kiểm tra session và quyết định mở UI hay báo lỗi
+RegisterNetEvent('tomtich:finishDigging')
+AddEventHandler('tomtich:finishDigging', function()
+    local src = source
+    
+    local session = playerDiggingSession[src]
+    if not session then
+        TriggerClientEvent('cautomtich:notification', src, nil, "⚠️ Lỗi hệ thống!")
+        TriggerClientEvent('tomtich:closeUI_immediate', src)
+        return
+    end
+    
+    -- Kiểm tra session có cho phép mở UI không
+    if not session.canOpenUI then
+        -- Đang cooldown → Báo không có tôm
+        local currentTime = os.time()
+        local remainingTime = 180 - (currentTime - (playerCooldownTimes[session.cid] or 0))
         local minutes = math.floor(remainingTime / 60)
         local seconds = remainingTime % 60
-        TriggerClientEvent('cautomtich:notification', src, nil, string.format("⏱️ Khu vực này không thấy tôm", minutes, seconds))
+        TriggerClientEvent('cautomtich:notification', src, nil, string.format("🦐 Ở đây không có tôm! Vui lòng tìm nơi khác", minutes, seconds))
+        TriggerClientEvent('tomtich:closeUI_immediate', src)
+        playerDiggingSession[src] = nil
         return
     end
     
-    -- 🔒 RATE LIMITING - Chống spam
-    if playerCooldowns[src] and os.time() - playerCooldowns[src] < Config.AntiSpam.cooldown then
-        TriggerClientEvent('cautomtich:notification', src, nil, "⏱️ Chờ " .. Config.AntiSpam.cooldown .. " giây trước khi chơi lại!")
-        return
-    end
-    
-    playerCooldowns[src] = os.time()
-    
+    -- OK → Cho phép mở UI
     local level = GetPlayerLevel(src)
     local exp = GetPlayerExp(src)
     
     activeTomTichGames[src] = {
         active = true,
         level = level,
-        startTime = os.time(), -- 🔒 Lưu thời gian bắt đầu
-        cid = cid -- Lưu CID
+        startTime = os.time(),
+        cid = session.cid
     }
     
-    -- Gửi thông tin level về client
     TriggerClientEvent('tomtich:updateLevel', src, level, exp)
+    TriggerClientEvent('tomtich:allowOpenUI', src)
+    
+    -- Xóa session
+    playerDiggingSession[src] = nil
+end)
+
+-- ✅ Event 3: Hủy đào cát (cancel) → Xóa cooldown
+RegisterNetEvent('tomtich:cancelDigging')
+AddEventHandler('tomtich:cancelDigging', function()
+    local src = source
+    
+    local session = playerDiggingSession[src]
+    if session and session.canOpenUI then
+        -- Nếu đang OK thì xóa cooldown vì đã cancel
+        playerCooldownTimes[session.cid] = nil
+    end
+    
+    playerDiggingSession[src] = nil
 end)
 
 RegisterNetEvent('tomtich:attempt')
@@ -127,6 +173,7 @@ AddEventHandler('tomtich:attempt', function(success, itemCode, customMessage)
     
     if gameDuration < Config.AntiSpam.minGameDuration then
         TriggerClientEvent('cautomtich:notification', src, nil, "⚠️ Phát hiện hành vi bất thường!")
+        TriggerClientEvent('tomtich:closeUI', src) -- Đóng UI luôn nếu cheat
         activeTomTichGames[src] = nil
         return
     end
@@ -163,10 +210,7 @@ AddEventHandler('tomtich:attempt', function(success, itemCode, customMessage)
         TriggerClientEvent('tomtich:updateLevel', src, finalLevel, currentExp)
     end
     
-    -- Lưu cooldown time theo CID
-    if game.cid then
-        playerCooldownTimes[game.cid] = os.time()
-    end
+    -- ✅ KHÔNG CẦN LƯU COOLDOWN Ở ĐÂY NỮA - Đã lưu từ lúc bắt đầu đào cát
     
     -- Thêm item vào inventory
     local addItemSuccess = ox:AddItem(src, item, 1)
@@ -178,33 +222,35 @@ AddEventHandler('tomtich:attempt', function(success, itemCode, customMessage)
     -- Kiểm tra level và câu thành công -> cơ hội hiển thị kho báu
     local willShowTreasure = false
     if fishingSuccess and currentPlayerLevel >= Config.Treasure.minLevelRequired then
-        -- Kiểm tra giới hạn 2 rương/giờ
+        -- Kiểm tra giới hạn 2 rương/giờ dựa trên CID (CitizenID)
+        local cid = game.cid
         local currentTime = os.time()
-        if not playerTreasureHistory[src] then
-            playerTreasureHistory[src] = {}
+        
+        if not playerTreasureHistory[cid] then
+            playerTreasureHistory[cid] = {}
         end
         
         -- Lọc bỏ các lần xuất hiện kho báu cũ hơn 1 giờ
         local recentTreasures = {}
-        for _, timestamp in ipairs(playerTreasureHistory[src]) do
+        for _, timestamp in ipairs(playerTreasureHistory[cid]) do
             if currentTime - timestamp < Config.Treasure.hourWindow then
                 table.insert(recentTreasures, timestamp)
             end
         end
-        playerTreasureHistory[src] = recentTreasures
+        playerTreasureHistory[cid] = recentTreasures
         
         -- Kiểm tra số lượng kho báu trong 1 giờ qua
-        local treasureCount = #playerTreasureHistory[src]
+        local treasureCount = #playerTreasureHistory[cid]
         
         if treasureCount >= Config.Treasure.maxPerHour then
-            -- Đã đạt giới hạn
+            -- Đã đạt giới hạn rương/giờ cho nhân vật này
         else
             local treasureChance = math.random(1, 100)
             if treasureChance <= Config.Treasure.treasureChance then
                 willShowTreasure = true
                 
-                -- Lưu timestamp xuất hiện kho báu
-                table.insert(playerTreasureHistory[src], currentTime)
+                -- Lưu timestamp xuất hiện kho báu cho CID này
+                table.insert(playerTreasureHistory[cid], currentTime)
                 
                 -- Delay 3 giây để người chơi thấy kết quả câu tôm trước
                 Citizen.SetTimeout(3000, function()
@@ -216,7 +262,9 @@ AddEventHandler('tomtich:attempt', function(success, itemCode, customMessage)
     
     -- Nếu không có kho báu, đóng UI sau 3 giây
     if not willShowTreasure then
-        TriggerClientEvent('tomtich:closeUI', src)
+        Citizen.SetTimeout(3000, function()
+            TriggerClientEvent('tomtich:closeUI_immediate', src) -- Trigger đóng ngay lập tức sau 3s
+        end)
     end
     
     -- Thông báo nếu túi đầy

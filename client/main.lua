@@ -4,7 +4,6 @@ local SPAWN_COOLDOWN = 180 -- 180 giây cooldown
 
 -- Trạng thái minigame tôm tích
 local isTomTichActive = false
-local lastPlayTime = 0 -- Thời gian chơi lần cuối
 local lastPlayPosition = nil -- Vị trí chơi lần cuối
 local MIN_DISTANCE_BETWEEN_PLAYS = 5.0 -- Khoảng cách tối thiểu giữa các lần chơi (đơn vị: bước chân)
 
@@ -43,6 +42,17 @@ AddEventHandler('tomtich:updateLevel', function(level, exp)
         action = "updateLevel",
         level = level,
         exp = exp
+    })
+end)
+
+-- ✅ Event mới: Cho phép mở UI sau khi server xác nhận OK
+RegisterNetEvent('tomtich:allowOpenUI')
+AddEventHandler('tomtich:allowOpenUI', function()
+    -- Mở UI minigame
+    SetNuiFocus(true, true)
+    SendNUIMessage({
+        action = "showTomTich",
+        config = Config
     })
 end)
 
@@ -94,9 +104,21 @@ function OpenTomTichGame()
     
     local playerPed = PlayerPedId()
     local playerCoords = GetEntityCoords(playerPed)
-    local currentTime = GetGameTimer() / 1000
+    
+    -- Kiểm tra vị trí (tránh đứng 1 chỗ chơi liên tục)
+    if lastPlayPosition then
+        local distance = #(playerCoords - lastPlayPosition)
+        if distance < MIN_DISTANCE_BETWEEN_PLAYS then
+            TriggerEvent('cautomtich:notification', nil, "🦐 Tôm ở đây đã bắt hết rồi! Hãy di chuyển sang chỗ khác.")
+            return
+        end
+    end
     
     isTomTichActive = true
+    
+    -- ✅ GỬI REQUEST KIỂM TRA COOLDOWN NGAY KHI BẮT ĐẦU ĐÀO
+    -- Server sẽ trả về allowDig (true/false)
+    TriggerServerEvent('tomtich:checkCooldown')
     
     -- Hiển thị progress bar đào cát
     PlayDiggingAnimation()
@@ -112,43 +134,18 @@ function OpenTomTichGame()
         -- Hoàn thành đào cát
         StopScratchAnimation()
         
-        -- Kiểm tra cooldown SAU KHI đào xong
-        if currentTime - lastPlayTime < SPAWN_COOLDOWN then
-            local remainingTime = math.ceil(SPAWN_COOLDOWN - (currentTime - lastPlayTime))
-            local minutes = math.floor(remainingTime / 60)
-            local seconds = remainingTime % 60
-            TriggerEvent('cautomtich:notification', nil, string.format("⏱️ Khu vực này không thấy tôm", minutes, seconds))
-            isTomTichActive = false
-            return
-        end
-        
-        -- Kiểm tra vị trí (tránh đứng 1 chỗ chơi liên tục)
-        if lastPlayPosition then
-            local distance = #(playerCoords - lastPlayPosition)
-            if distance < MIN_DISTANCE_BETWEEN_PLAYS then
-                TriggerEvent('cautomtich:notification', nil, "🦐 Tôm ở đây đã bắt hết rồi! Hãy di chuyển sang chỗ khác.")
-                isTomTichActive = false
-                return
-            end
-        end
-        
-        -- Lưu thời gian và vị trí chơi
-        lastPlayTime = GetGameTimer() / 1000
+        -- Lưu vị trí chơi
         lastPlayPosition = playerCoords
         
-        -- Mở minigame
-        TriggerServerEvent('tomtich:startGame')
-        
-        SetNuiFocus(true, true)
-        SendNUIMessage({
-            action = "showTomTich",
-            config = Config -- Gửi toàn bộ config sang JS
-        })
+        -- ✅ Gửi request lên server để mở UI (server đã lưu cooldown từ lúc checkCooldown)
+        TriggerServerEvent('tomtich:finishDigging')
     end, function() -- Cancel
         -- Hủy bỏ
         StopScratchAnimation()
         isTomTichActive = false
         TriggerEvent('cautomtich:notification', nil, "❌ Đã hủy đào cát")
+        -- Hủy cooldown nếu cancel
+        TriggerServerEvent('tomtich:cancelDigging')
     end)
 end
 
@@ -188,6 +185,11 @@ end, false)
 -- Nhận kết quả từ server
 RegisterNetEvent('tomtich:gameResult')
 AddEventHandler('tomtich:gameResult', function(success, item)
+    -- ✅ Đảm bảo game đang active trước khi gửi kết quả
+    if not isTomTichActive then
+        return
+    end
+    
     SendNUIMessage({
         action = "tomtichResult",
         success = success,
@@ -215,12 +217,19 @@ AddEventHandler('tomtich:showTreasureAfterGame', function()
     end)
 end)
 
--- Event đóng UI tôm tích thông thường (không có kho báu)
+-- Event đóng UI tôm tích sau 3 giây (để chờ xem kết quả)
 RegisterNetEvent('tomtich:closeUI')
 AddEventHandler('tomtich:closeUI', function()
     Citizen.SetTimeout(3000, function()
         CloseTomTichGame()
     end)
+end)
+
+-- Event đóng UI tôm tích ngay lập tức (thường gọi sau khi server đã chờ đủ 3s)
+RegisterNetEvent('tomtich:closeUI_immediate')
+AddEventHandler('tomtich:closeUI_immediate', function()
+    isTomTichActive = false -- ✅ Đảm bảo reset trạng thái
+    CloseTomTichGame()
 end)
 
 -- Callback từ NUI

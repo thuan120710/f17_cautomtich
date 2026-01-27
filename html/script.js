@@ -971,10 +971,12 @@ const app = createApp({
                 })
             });
 
-            // KHÔNG tự động đóng UI - để server quyết định (có thể mở kho báu)
-            // setTimeout(() => {
-            //     closeGameUI();
-            // }, 3000);
+            // Failsafe: Nếu server không phản hồi đóng UI sau 10 giây, tự đóng
+            setTimeout(() => {
+                if (tomtichVisible.value && gamePhase.value === 'RESULT') {
+                    handleTomTichClose();
+                }
+            }, 5000);
         };
 
         const getParentResourceName = () => 'f17_cautomtich';
@@ -1089,6 +1091,9 @@ const app = createApp({
                 closeTreasureGame();
             } else if (event.data.action === 'treasureGameData') {
                 treasureAttempts.value = event.data.data.attempts;
+            } else if (event.data.action === 'tomtichResult') {
+                // Server đã xác nhận kết quả, UI có thể hiển thị thêm hiệu ứng nếu cần
+                console.log("TomTich Result received:", event.data.success);
             }
         };
 
