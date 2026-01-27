@@ -7,24 +7,10 @@ const { createApp, ref, onMounted, onBeforeUnmount } = Vue;
 // ============================================
 // CONSTANTS & SOUNDS
 // ============================================
-const SOUNDS = {
-    win: new Audio('https://assets.mixkit.co/active_storage/sfx/2000/2000-preview.mp3'),
-    lose: new Audio('https://assets.mixkit.co/active_storage/sfx/2955/2955-preview.mp3'),
-    ocean: new Audio('https://assets.mixkit.co/active_storage/sfx/2393/2393-preview.mp3'),
-    // Âm thanh cho tôm tích
-    reelIn: new Audio('https://assets.mixkit.co/active_storage/sfx/2571/2571-preview.mp3'), // Âm thanh kéo dây
-    shrimpPull: new Audio('https://assets.mixkit.co/active_storage/sfx/2573/2573-preview.mp3'), // Âm thanh tôm giật
-    tension: new Audio('https://assets.mixkit.co/active_storage/sfx/2577/2577-preview.mp3') // Âm thanh căng dây
+// Sound objects will be initialized in updateConfig
+let SOUNDS = {
+    win: null, lose: null, ocean: null, reelIn: null, shrimpPull: null, tension: null
 };
-
-SOUNDS.win.volume = 0.5;
-SOUNDS.lose.volume = 0.4;
-SOUNDS.ocean.volume = 0.2;
-SOUNDS.ocean.loop = true;
-SOUNDS.reelIn.volume = 0.3;
-SOUNDS.reelIn.loop = true; // Lặp lại khi đang kéo
-SOUNDS.shrimpPull.volume = 0.6;
-SOUNDS.tension.volume = 0.4;
 
 // ============================================
 // ROOT APP
@@ -57,36 +43,22 @@ const app = createApp({
         const treasureGameEnded = ref(false);
         const treasureSuccess = ref(false);
         const treasureResultMessage = ref('');
+        const treasurePositions = ref([]); // Local treasure positions
+        const treasureOpenedIndices = ref([]); // Track opened cells
 
 
-        // Game Configuration - Level System
-        const SHRIMP_TYPES_BY_LEVEL = {
-            1: [
-                { id: 'tomtich', name: 'Tôm Tích', image: 'images/tomtich.png', chance: 60 },
-                { id: 'tomtichxanh', name: 'Tôm Tích Xanh', image: 'images/tomtich_xanh.png', chance: 35 },
-                { id: 'tomtichdo', name: 'Tôm Tích Đỏ', image: 'images/tomtich_do.png', chance: 5 },
-                { id: 'tomtichhoangkim', name: 'Tôm Tích Hoàng Kim', image: 'images/tomtich_vang.png', chance: 0 }
-            ],
-            2: [
-                { id: 'tomtich', name: 'Tôm Tích', image: 'images/tomtich.png', chance: 45 },
-                { id: 'tomtichxanh', name: 'Tôm Tích Xanh', image: 'images/tomtich_xanh.png', chance: 40 },
-                { id: 'tomtichdo', name: 'Tôm Tích Đỏ', image: 'images/tomtich_do.png', chance: 10 },
-                { id: 'tomtichhoangkim', name: 'Tôm Tích Hoàng Kim', image: 'images/tomtich_vang.png', chance: 5 }
-            ],
-            3: [
-                { id: 'tomtich', name: 'Tôm Tích', image: 'images/tomtich.png', chance: 40 },
-                { id: 'tomtichxanh', name: 'Tôm Tích Xanh', image: 'images/tomtich_xanh.png', chance: 30 },
-                { id: 'tomtichdo', name: 'Tôm Tích Đỏ', image: 'images/tomtich_do.png', chance: 15 },
-                { id: 'tomtichhoangkim', name: 'Tôm Tích Hoàng Kim', image: 'images/tomtich_vang.png', chance: 15 }
-            ]
-        };
+        // Game Configuration (Will be synced from Lua)
+        const uiConfig = ref(null);
+
+        // Dynamic Shrimp Types (will be generated from Config)
+        const shrimpTypesByLevel = ref({});
 
         // Player level (will be received from server)
         const playerLevel = ref(1);
 
         // Game State
-        const currentShrimp = ref(SHRIMP_TYPES_BY_LEVEL[1][0]);
-        const currentShrimpImage = ref('images/tomtich.png');
+        const currentShrimp = ref(null);
+        const currentShrimpImage = ref('');
 
         // Tension system
         const tensionLevel = ref(50);
@@ -105,20 +77,46 @@ const app = createApp({
         let lastUpdateTime = 0;
         let gameStartTime = 0;
 
-        // Constants
-        const TENSION_SAFE_MIN = 30;
-        const TENSION_SAFE_MAX = 70;
-        const GAME_TIME_LIMIT = 30000;
-        const CATCH_DURATION = 20000;
-        const PULL_INTERVAL_MIN = 2000;
-        const PULL_INTERVAL_MAX = 4000;
+        // Constants (Updated via updateConfig)
+        let TENSION_SAFE_MIN = 30;
+        let TENSION_SAFE_MAX = 70;
+        let GAME_TIME_LIMIT = 30000;
+        let CATCH_DURATION = 20000;
+        let PULL_INTERVAL_MIN = 2000;
+        let PULL_INTERVAL_MAX = 4000;
+
+        let TUNNEL_TOTAL_DEPTH = 5000;
+        let TUNNEL_PATH_WIDTH = 130;
+        let TUNNEL_WARNING_DIST = 20;
+        let TUNNEL_MAX_SPEED = 3.0;
+        let TUNNEL_ACCEL = 0.1;
+        let TUNNEL_FRICTION = 0.2;
+        let TUNNEL_RETRACT_SPEED = 8;
+        let TUNNEL_LERP_SPEED = 0.25;
+        let TUNNEL_SWAY = 80;
+
+        let DROP_SPEED = 40;
+        let DROP_RETRACT_SPEED = 60;
+
+        let WAIT_MIN = 5000;
+        let WAIT_RAND = 3000;
+        let BITE_WINDOW = 2000;
+
+        let TENSION_INC_HOLD = 35;
+        let TENSION_DEC_REL = 25;
+        let RESISTANCE_BASE = 15;
+        let PROGRESS_DEC_RATE = 50;
+        let FAIL_TENSION_MAX = 95;
+        let FAIL_TENSION_MIN = 5;
+        let WARN_THRESHOLD_HI = 85;
+        let WARN_THRESHOLD_LO = 15;
 
         // Sound Helper
         const stopAllSounds = () => {
-            SOUNDS.ocean.pause(); SOUNDS.ocean.currentTime = 0;
-            SOUNDS.reelIn.pause(); SOUNDS.reelIn.currentTime = 0;
-            SOUNDS.tension.pause(); SOUNDS.tension.currentTime = 0;
-            SOUNDS.shrimpPull.pause(); SOUNDS.shrimpPull.currentTime = 0;
+            if (SOUNDS.ocean) { SOUNDS.ocean.pause(); SOUNDS.ocean.currentTime = 0; }
+            if (SOUNDS.reelIn) { SOUNDS.reelIn.pause(); SOUNDS.reelIn.currentTime = 0; }
+            if (SOUNDS.tension) { SOUNDS.tension.pause(); SOUNDS.tension.currentTime = 0; }
+            if (SOUNDS.shrimpPull) { SOUNDS.shrimpPull.pause(); SOUNDS.shrimpPull.currentTime = 0; }
         };
 
         // ============================================
@@ -201,16 +199,16 @@ const app = createApp({
                 // Reset State
                 tunnelState = {
                     active: true,
-                    path: generateTunnelPath(TOTAL_DEPTH + canvas.height, width),
+                    path: generateTunnelPath(TUNNEL_TOTAL_DEPTH + canvas.height, width),
                     hookX: width / 2,
                     hookY: 100,
                     hookVelocityX: 0, // Vận tốc ngang của móc
                     depth: 0,
                     linePoints: [],
                     speed: 0,
-                    maxSpeed: 3.0,
-                    acceleration: 0.1,
-                    friction: 0.2,
+                    maxSpeed: TUNNEL_MAX_SPEED,
+                    acceleration: TUNNEL_ACCEL,
+                    friction: TUNNEL_FRICTION,
                     cameraY: 0,
                     mouseX: width / 2,
                     targetX: width / 2, // Target position với smoothing
@@ -220,7 +218,7 @@ const app = createApp({
                     combo: 0,
                     comboTimer: 0,
                     isRetracting: false,
-                    retractSpeed: 8
+                    retractSpeed: TUNNEL_RETRACT_SPEED
                 };
 
                 showTunnelInstruction.value = true;
@@ -256,17 +254,17 @@ const app = createApp({
 
             for (let y = 0; y < length; y += 20) {
                 // Random sway với độ cong CỰC LỚN - đi thẳng chắc chắn đụng
-                const change = (Math.random() - 0.5) * 80; // Tăng lên 400 (gấp 5 lần ban đầu)
+                const change = (Math.random() - 0.5) * TUNNEL_SWAY;
                 currentX += change;
 
                 // Clamp to keep on screen
-                const margin = PATH_WIDTH / 2 + 80;
+                const margin = TUNNEL_PATH_WIDTH / 2 + 80;
                 currentX = Math.max(margin, Math.min(screenWidth - margin, currentX));
 
                 points.push({
                     y,
                     x: currentX,
-                    width: PATH_WIDTH + Math.sin(y * 0.01) * 15 // Varying width ít hơn vì đã hẹp
+                    width: TUNNEL_PATH_WIDTH + Math.sin(y * 0.01) * 15 // Varying width ít hơn vì đã hẹp
                 });
             }
             return points;
@@ -292,7 +290,7 @@ const app = createApp({
             if (tunnelState.isRetracting) {
                 tunnelState.depth -= tunnelState.retractSpeed;
                 tunnelState.cameraY = tunnelState.depth;
-                tunnelProgress.value = Math.max(0, (tunnelState.depth / TOTAL_DEPTH) * 100);
+                tunnelProgress.value = Math.max(0, (tunnelState.depth / TUNNEL_TOTAL_DEPTH) * 100);
 
                 // Khi về đến đầu
                 if (tunnelState.depth <= 0) {
@@ -323,13 +321,13 @@ const app = createApp({
             tunnelSpeed.value = Math.round((tunnelState.speed / tunnelState.maxSpeed) * 100);
 
             // Progress calculation
-            tunnelProgress.value = Math.min(100, (tunnelState.depth / TOTAL_DEPTH) * 100);
+            tunnelProgress.value = Math.min(100, (tunnelState.depth / TUNNEL_TOTAL_DEPTH) * 100);
 
             // === HOOK MOVEMENT - Direct follow mouse (no physics) ===
             const canvas = tunnelCanvas.value;
 
             // Móc câu theo chuột trực tiếp với smooth lerp
-            const lerpSpeed = 0.25; // Tốc độ theo chuột
+            const lerpSpeed = TUNNEL_LERP_SPEED; // Tốc độ theo chuột
             tunnelState.hookX += (tunnelState.targetX - tunnelState.hookX) * lerpSpeed;
 
             // Giới hạn trong canvas
@@ -342,12 +340,12 @@ const app = createApp({
             const currentPoint = tunnelState.path[currentPointIndex] || tunnelState.path[tunnelState.path.length - 1];
 
             const tunnelCenterX = currentPoint.x;
-            const currentPathWidth = currentPoint.width || PATH_WIDTH;
+            const currentPathWidth = currentPoint.width || TUNNEL_PATH_WIDTH;
             const safeHalfWidth = currentPathWidth / 2;
             const distanceFromWall = Math.abs(tunnelState.hookX - tunnelCenterX);
 
             // Warning zone (near walls)
-            if (distanceFromWall > safeHalfWidth - WARNING_DISTANCE) {
+            if (distanceFromWall > safeHalfWidth - TUNNEL_WARNING_DIST) {
                 tunnelCollisionWarning.value = true;
                 tunnelCombo.value = 0;
                 tunnelState.combo = 0;
@@ -392,7 +390,7 @@ const app = createApp({
             }
 
             // === WIN CONDITION ===
-            if (tunnelState.depth >= TOTAL_DEPTH) {
+            if (tunnelState.depth >= TUNNEL_TOTAL_DEPTH) {
                 tunnelState.active = false;
                 tunnelCompleted.value = true;
                 tunnelMessage.value = '✅ Hoàn thành! Chuẩn bị thả câu...';
@@ -483,7 +481,7 @@ const app = createApp({
                 const p = tunnelState.path[i];
                 const screenY = p.y - tunnelState.cameraY;
                 const screenX = p.x;
-                const pathWidth = p.width || PATH_WIDTH;
+                const pathWidth = p.width || TUNNEL_PATH_WIDTH;
 
                 // Draw wall shadows
                 const wallGradient = ctx.createRadialGradient(screenX, screenY, pathWidth / 2, screenX, screenY, pathWidth / 2 + 30);
@@ -497,7 +495,7 @@ const app = createApp({
             }
 
             // Draw safe path (lighter)
-            ctx.lineWidth = PATH_WIDTH;
+            ctx.lineWidth = TUNNEL_PATH_WIDTH;
             ctx.strokeStyle = '#3e3020';
             ctx.beginPath();
             let first = true;
@@ -668,12 +666,12 @@ const app = createApp({
 
             if (isHoldingSpace.value) {
                 // Holding = Drop line down
-                dropDepth.value += 40 * deltaTime;
-                if (SOUNDS.reelIn.paused) SOUNDS.reelIn.play().catch(() => { });
+                dropDepth.value += DROP_SPEED * deltaTime;
+                if (SOUNDS.reelIn && SOUNDS.reelIn.paused) SOUNDS.reelIn.play().catch(() => { });
             } else {
                 // Released = Retract line up
-                dropDepth.value -= 60 * deltaTime;
-                if (!SOUNDS.reelIn.paused) {
+                dropDepth.value -= DROP_RETRACT_SPEED * deltaTime;
+                if (SOUNDS.reelIn && !SOUNDS.reelIn.paused) {
                     SOUNDS.reelIn.pause();
                     SOUNDS.reelIn.currentTime = 0;
                 }
@@ -710,12 +708,12 @@ const app = createApp({
 
         const startWaitingPhase = () => {
             gamePhase.value = 'WAITING';
-            // Random wait 5-8s
-            waitTimer.value = 5000 + Math.random() * 3000;
+            // Random wait from config
+            waitTimer.value = WAIT_MIN + Math.random() * WAIT_RAND;
             lastUpdateTime = Date.now();
 
             // Stop reel sound
-            if (!SOUNDS.reelIn.paused) {
+            if (SOUNDS.reelIn && !SOUNDS.reelIn.paused) {
                 SOUNDS.reelIn.pause();
                 SOUNDS.reelIn.currentTime = 0;
             }
@@ -753,7 +751,7 @@ const app = createApp({
 
         const startBitingPhase = () => {
             gamePhase.value = 'BITING';
-            biteTimer.value = 2000; // 2s window
+            biteTimer.value = BITE_WINDOW; // Time window from config
             shrimpPulling.value = true; // Shake effect
 
             // Play urgent sound
@@ -761,7 +759,7 @@ const app = createApp({
             SOUNDS.shrimpPull.play().catch(() => { });
 
             // Play tension sound for urgency
-            if (SOUNDS.tension.paused) {
+            if (SOUNDS.tension && SOUNDS.tension.paused) {
                 SOUNDS.tension.currentTime = 0;
                 SOUNDS.tension.play().catch(() => { });
             }
@@ -783,7 +781,7 @@ const app = createApp({
                 shrimpPulling.value = false;
 
                 // Stop tension sound
-                if (!SOUNDS.tension.paused) {
+                if (SOUNDS.tension && !SOUNDS.tension.paused) {
                     SOUNDS.tension.pause();
                     SOUNDS.tension.currentTime = 0;
                 }
@@ -798,7 +796,7 @@ const app = createApp({
                 shrimpPulling.value = false;
 
                 // Stop tension sound
-                if (!SOUNDS.tension.paused) {
+                if (SOUNDS.tension && !SOUNDS.tension.paused) {
                     SOUNDS.tension.pause();
                     SOUNDS.tension.currentTime = 0;
                 }
@@ -822,11 +820,17 @@ const app = createApp({
                 SOUNDS.reelIn.currentTime = 0;
             }
 
-            // Random shrimp selection based on player level
+            // Random shrimp selection based on dynamic config
             const currentLevel = playerLevel.value;
-            const shrimpTypes = SHRIMP_TYPES_BY_LEVEL[currentLevel] || SHRIMP_TYPES_BY_LEVEL[1];
+            const shrimpTypes = shrimpTypesByLevel.value[currentLevel] || (shrimpTypesByLevel.value[1] || []);
 
-            const rand = Math.random() * 100; // 0-100
+            if (shrimpTypes.length === 0) {
+                console.error("No shrimp types defined for level", currentLevel);
+                endTomTichGame(false, 'Lỗi cấu hình (Không có tôm)');
+                return;
+            }
+
+            const rand = Math.random() * 100;
             let cumulative = 0;
             let selected = shrimpTypes[0];
 
@@ -840,10 +844,12 @@ const app = createApp({
             currentShrimp.value = selected;
             currentShrimpImage.value = selected.image;
 
-            // Difficulty adjustment based on rarity
+            // Difficulty adjustment based on rarity multipliers in config
             let difficultyMult = 1.0;
-            if (selected.id === 'tomtichhoangkim') difficultyMult = 1.3;
-            else if (selected.id === 'tomtichdo') difficultyMult = 1.1;
+            const rarityConfigs = uiConfig.value && uiConfig.value.Fishing ? uiConfig.value.Fishing.rarityMultipliers : {};
+            if (rarityConfigs[selected.id]) {
+                difficultyMult = rarityConfigs[selected.id];
+            }
 
             shrimpResistance.value = (0.4 + Math.random() * 0.4) * difficultyMult;
 
@@ -891,25 +897,25 @@ const app = createApp({
 
             // Control physics
             if (isHoldingSpace.value) {
-                tensionLevel.value += 35 * deltaTime; // Slightly easier to pull up
-                if (SOUNDS.reelIn.paused) SOUNDS.reelIn.play().catch(() => { });
+                tensionLevel.value += TENSION_INC_HOLD * deltaTime;
+                if (SOUNDS.reelIn && SOUNDS.reelIn.paused) SOUNDS.reelIn.play().catch(() => { });
             } else {
-                tensionLevel.value -= 25 * deltaTime; // Slower drop
-                if (!SOUNDS.reelIn.paused) {
+                tensionLevel.value -= TENSION_DEC_REL * deltaTime;
+                if (SOUNDS.reelIn && !SOUNDS.reelIn.paused) {
                     SOUNDS.reelIn.pause();
                     SOUNDS.reelIn.currentTime = 0;
                 }
             }
 
             // Resistance
-            tensionLevel.value -= shrimpResistance.value * 15 * deltaTime;
+            tensionLevel.value -= shrimpResistance.value * RESISTANCE_BASE * deltaTime;
             tensionLevel.value = Math.max(0, Math.min(100, tensionLevel.value));
 
             // Sound warning
-            if (tensionLevel.value >= 85 || tensionLevel.value <= 15) {
-                if (SOUNDS.tension.paused) SOUNDS.tension.play().catch(() => { });
+            if (tensionLevel.value >= WARN_THRESHOLD_HI || tensionLevel.value <= WARN_THRESHOLD_LO) {
+                if (SOUNDS.tension && SOUNDS.tension.paused) SOUNDS.tension.play().catch(() => { });
             } else {
-                if (!SOUNDS.tension.paused) {
+                if (SOUNDS.tension && !SOUNDS.tension.paused) {
                     SOUNDS.tension.pause();
                     SOUNDS.tension.currentTime = 0;
                 }
@@ -919,18 +925,17 @@ const app = createApp({
             shrimpPosition.value = 20 + (tensionLevel.value * 0.6);
             fishingLineHeight.value = shrimpPosition.value + 10;
 
-            // Progress
             if (tensionLevel.value >= TENSION_SAFE_MIN && tensionLevel.value <= TENSION_SAFE_MAX) {
                 catchProgress.value += 100 / (CATCH_DURATION / 1000) * deltaTime;
             } else {
-                catchProgress.value -= 50 / (CATCH_DURATION / 1000) * deltaTime;
+                catchProgress.value -= PROGRESS_DEC_RATE / (CATCH_DURATION / 1000) * deltaTime;
             }
             catchProgress.value = Math.max(0, Math.min(100, catchProgress.value));
 
             // End Conditions
-            if (tensionLevel.value <= 5) {
+            if (tensionLevel.value <= FAIL_TENSION_MIN) {
                 endTomTichGame(false, 'Tôm tích đã chui vào hang!');
-            } else if (tensionLevel.value >= 95) {
+            } else if (tensionLevel.value >= FAIL_TENSION_MAX) {
                 endTomTichGame(false, 'Dây câu đã đứt!');
             } else if (catchProgress.value >= 100) {
                 endTomTichGame(true, `Câu được ${currentShrimp.value.name}!`);
@@ -974,33 +979,116 @@ const app = createApp({
 
         const getParentResourceName = () => 'f17_cautomtich';
 
+        const updateConfig = (config) => {
+            if (!config || !config.NUI) return;
+            uiConfig.value = config.NUI;
+            const nui = config.NUI;
+
+            // Update Sounds
+            if (nui.Sounds) {
+                for (const [key, data] of Object.entries(nui.Sounds)) {
+                    if (SOUNDS[key]) {
+                        // If already exists, just update volume
+                        SOUNDS[key].volume = data.volume || 0.5;
+                    } else {
+                        SOUNDS[key] = new Audio(data.url);
+                        SOUNDS[key].volume = data.volume || 0.5;
+                    }
+                }
+                if (SOUNDS.ocean) SOUNDS.ocean.loop = true;
+                if (SOUNDS.reelIn) SOUNDS.reelIn.loop = true;
+            }
+
+            // Update Fishing Mechanics
+            if (nui.Fishing) {
+                const f = nui.Fishing;
+                TENSION_SAFE_MIN = f.tensionSafeMin || 30;
+                TENSION_SAFE_MAX = f.tensionSafeMax || 70;
+                GAME_TIME_LIMIT = f.gameTimeLimit || 30000;
+                CATCH_DURATION = f.catchDuration || 20000;
+                PULL_INTERVAL_MIN = f.pullIntervalMin || 2000;
+                PULL_INTERVAL_MAX = f.pullIntervalMax || 4000;
+
+                TENSION_INC_HOLD = f.tensionIncreaseHolding || 35;
+                TENSION_DEC_REL = f.tensionDecreaseReleased || 25;
+                RESISTANCE_BASE = f.resistanceBase || 15;
+                PROGRESS_DEC_RATE = f.progressDecreaseRate || 50;
+                FAIL_TENSION_MAX = f.failTensionMax || 95;
+                FAIL_TENSION_MIN = f.failTensionMin || 5;
+                WARN_THRESHOLD_HI = f.warningThresholdHigh || 85;
+                WARN_THRESHOLD_LO = f.warningThresholdLow || 15;
+
+                timeRemaining.value = GAME_TIME_LIMIT / 1000;
+            }
+
+            // Tunnel Config
+            if (nui.Tunnel) {
+                const t = nui.Tunnel;
+                TUNNEL_TOTAL_DEPTH = t.totalDepth || 5000;
+                TUNNEL_PATH_WIDTH = t.pathWidth || 130;
+                TUNNEL_WARNING_DIST = t.warningDistance || 20;
+                TUNNEL_MAX_SPEED = t.maxSpeed || 3.0;
+                TUNNEL_ACCEL = t.acceleration || 0.1;
+                TUNNEL_FRICTION = t.friction || 0.2;
+                TUNNEL_RETRACT_SPEED = t.retractSpeed || 8;
+                TUNNEL_LERP_SPEED = t.lerpSpeed || 0.25;
+                TUNNEL_SWAY = t.swayAmount || 80;
+            }
+
+            // Phases Config
+            if (nui.Dropping) {
+                DROP_SPEED = nui.Dropping.dropSpeed || 40;
+                DROP_RETRACT_SPEED = nui.Dropping.retractSpeed || 60;
+            }
+            if (nui.Biting) {
+                WAIT_MIN = nui.Biting.waitMin || 5000;
+                WAIT_RAND = nui.Biting.waitRandom || 3000;
+                BITE_WINDOW = nui.Biting.biteWindow || 2000;
+            }
+
+            // Generate shrimpTypesByLevel from Config.LevelConfig and Config.NUIItems
+            if (config.LevelConfig && config.NUIItems) {
+                const levels = {};
+                for (const [lvl, data] of Object.entries(config.LevelConfig)) {
+                    levels[lvl] = [];
+                    for (const [itemId, chance] of Object.entries(data.rates || {})) {
+                        if (chance > 0 && config.NUIItems[itemId]) {
+                            levels[lvl].push({
+                                id: itemId,
+                                name: config.NUIItems[itemId].name,
+                                image: config.NUIItems[itemId].image,
+                                chance: chance
+                            });
+                        }
+                    }
+                }
+                shrimpTypesByLevel.value = levels;
+            }
+        };
+
         // Event Handling
         const handleMessage = (event) => {
             if (event.data.action === 'showTomTich') {
+                if (event.data.config) updateConfig(event.data.config);
                 resetGameState();
                 gamePhase.value = 'IDLE';
                 tomtichVisible.value = true;
-                // Receive player level from server
                 if (event.data.level) {
                     playerLevel.value = Math.min(3, Math.max(1, event.data.level));
                 }
             } else if (event.data.action === 'hideTomTich') {
                 closeGameUI();
             } else if (event.data.action === 'updateLevel') {
-                // Update level from server
                 if (event.data.level) {
                     playerLevel.value = Math.min(3, Math.max(1, event.data.level));
                 }
             } else if (event.data.action === 'showTreasure') {
+                if (event.data.config) updateConfig(event.data.config);
                 initTreasureGame();
             } else if (event.data.action === 'hideTreasure') {
                 closeTreasureGame();
             } else if (event.data.action === 'treasureGameData') {
                 treasureAttempts.value = event.data.data.attempts;
-            } else if (event.data.action === 'treasureCellResult') {
-                handleTreasureCellResult(event.data.data);
-            } else if (event.data.action === 'treasureGameEnd') {
-                handleTreasureGameEnd(event.data.data);
             }
         };
 
@@ -1009,22 +1097,64 @@ const app = createApp({
         // ============================================
 
         const initTreasureGame = () => {
+            const config = uiConfig.value ? uiConfig.value.Treasure : null;
+
             treasureVisible.value = true;
             treasureGameEnded.value = false;
             treasureSuccess.value = false;
             treasureFound.value = 0;
-            treasureAttempts.value = 5;
+            treasureAttempts.value = config ? config.initialAttempts : 5;
             treasureHint.value = '';
             treasureResultMessage.value = '';
+            treasureOpenedIndices.value = [];
 
-            // Initialize 25 cells (5x5)
+            // Initialize cells based on gridSize
+            const gridSize = config ? config.gridSize : 5;
+            const cellCount = gridSize * gridSize;
+
             treasureCells.value = [];
-            for (let i = 0; i < 25; i++) {
+            for (let i = 0; i < cellCount; i++) {
                 treasureCells.value.push({
                     opened: false,
                     isTreasure: false
                 });
             }
+
+            // LOCAL GENERATION: Generate treasure positions
+            generateLocalTreasures();
+        };
+
+        const generateLocalTreasures = () => {
+            const config = uiConfig.value ? uiConfig.value.Treasure : null;
+            const gridSize = config ? config.gridSize : 5;
+            const count = config ? config.treasureCount : 2;
+            const minDistance = config ? config.minDistance : 3;
+
+            const positions = [];
+            const cellCount = gridSize * gridSize;
+
+            while (positions.length < count) {
+                const pos = Math.floor(Math.random() * cellCount);
+
+                if (!positions.includes(pos)) {
+                    if (positions.length === 1) {
+                        const firstPos = positions[0];
+                        const row1 = Math.floor(firstPos / gridSize);
+                        const col1 = firstPos % gridSize;
+                        const row2 = Math.floor(pos / gridSize);
+                        const col2 = pos % gridSize;
+                        const dist = Math.abs(row1 - row2) + Math.abs(col1 - col2);
+
+                        if (dist >= minDistance) {
+                            positions.push(pos);
+                        }
+                    } else {
+                        positions.push(pos);
+                    }
+                }
+            }
+            treasurePositions.value = positions;
+            console.log("Treasures hidden at:", positions);
         };
 
         const closeTreasureGame = () => {
@@ -1045,51 +1175,123 @@ const app = createApp({
                 return;
             }
 
-            fetch(`https://${getParentResourceName()}/treasureOpenCell`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ cellIndex: index })
-            });
-        };
-
-        const handleTreasureCellResult = (data) => {
-            const cell = treasureCells.value[data.cellIndex];
+            // LOCAL LOGIC
+            const cell = treasureCells.value[index];
             cell.opened = true;
-            cell.isTreasure = data.isTreasure;
+            treasureOpenedIndices.value.push(index);
 
-            treasureAttempts.value = data.attemptsLeft;
-            treasureFound.value = data.foundCount;
+            const isTreasure = treasurePositions.value.includes(index);
+            cell.isTreasure = isTreasure;
 
-            if (data.isTreasure) {
+            if (isTreasure) {
+                treasureFound.value++;
+                treasureAttempts.value++; // Bonus turn
                 treasureHint.value = '🎉 Tìm được kho báu! +1 lượt thưởng!';
                 SOUNDS.win.play().catch(() => { });
+
+                // Check Win
+                const config = uiConfig.value ? uiConfig.value.Treasure : null;
+                const targetCount = config ? config.treasureCount : 2;
+                if (treasureFound.value >= targetCount) {
+                    finishTreasureGame(true);
+                }
             } else {
-                treasureHint.value = data.hint || '';
+                treasureAttempts.value--;
+
+                // Generate Hint locally
+                const hint = generateLocalHint(index);
+                treasureHint.value = hint;
                 SOUNDS.lose.play().catch(() => { });
+
+                // Check Lose
+                if (treasureAttempts.value <= 0) {
+                    finishTreasureGame(false);
+                }
             }
         };
 
-        const handleTreasureGameEnd = (data) => {
-            treasureGameEnded.value = true;
-            treasureSuccess.value = data.success;
+        const generateLocalHint = (cellIndex) => {
+            const config = uiConfig.value ? uiConfig.value.Treasure : null;
+            const gridSize = config ? config.gridSize : 5;
+            const row = Math.floor(cellIndex / gridSize);
+            const col = cellIndex % gridSize;
 
-            // Reveal all treasures
-            if (data.treasures) {
-                data.treasures.forEach(pos => {
-                    treasureCells.value[pos].isTreasure = true;
-                });
+            // Find closest unfound treasure
+            let minDistance = 999;
+            let closestTreasure = null;
+
+            treasurePositions.value.forEach(tPos => {
+                const isFound = treasureOpenedIndices.value.includes(tPos) && treasureCells.value[tPos].isTreasure;
+                if (!isFound) {
+                    const tRow = Math.floor(tPos / gridSize);
+                    const tCol = tPos % gridSize;
+                    const dist = Math.abs(row - tRow) + Math.abs(col - tCol);
+                    if (dist < minDistance) {
+                        minDistance = dist;
+                        closestTreasure = tPos;
+                    }
+                }
+            });
+
+            if (closestTreasure === null) return "Không còn kho báu nào!";
+
+            const tRow = Math.floor(closestTreasure / gridSize);
+            const tCol = closestTreasure % gridSize;
+            const rowDiff = tRow - row;
+            const colDiff = tCol - col;
+
+            if (Math.abs(rowDiff) + Math.abs(colDiff) === 1) {
+                return "🔥 Kho báu đã gần bạn lắm rồi!";
+            }
+            if (Math.abs(rowDiff) === 1 && Math.abs(colDiff) === 1) {
+                return "🎯 Kho báu ở gần đây";
             }
 
-            // Delay showing result popup to let cards flip
+            const directions = [];
+            if (rowDiff < 0) directions.push("Trên");
+            if (rowDiff > 0) directions.push("Dưới");
+            if (colDiff < 0) directions.push("Trái");
+            if (colDiff > 0) directions.push("Phải");
+
+            return "📍 Xa – " + directions.join("/");
+        };
+
+        const finishTreasureGame = (success) => {
+            treasureGameEnded.value = true;
+            treasureSuccess.value = success;
+
+            // Reveal all treasures
+            treasurePositions.value.forEach(pos => {
+                treasureCells.value[pos].isTreasure = true;
+            });
+
             setTimeout(() => {
-                if (data.success) {
+                if (success) {
                     treasureResultMessage.value = '🎉 Chúc mừng! Bạn đã nhận được kho báu!';
                     SOUNDS.win.play().catch(() => { });
+
+                    // Notify server ONLY when win to give reward
+                    fetch(`https://${getParentResourceName()}/treasureFinish`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ success: true })
+                    });
                 } else {
                     treasureResultMessage.value = '😔 Hết lượt! Hãy thử lại lần sau.';
                     SOUNDS.lose.play().catch(() => { });
+
+                    fetch(`https://${getParentResourceName()}/treasureFinish`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ success: false })
+                    });
                 }
-            }, 1500); // Delay 1.5s để xem các lá bài lật
+
+                // Auto-close UI after 5 seconds of showing result
+                setTimeout(() => {
+                    handleTreasureClose();
+                }, 5000);
+            }, 1500);
         };
 
         const handleKeydown = (e) => {

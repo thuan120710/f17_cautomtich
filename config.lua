@@ -17,6 +17,82 @@ Config.Items = {
     TREASURE = "khobau"
 }
 
+-- Thông tin hiển thị trên NUI
+Config.NUIItems = {
+    [Config.Items.COMMON] = { name = 'Tôm Tích', image = 'images/tomtich.png' },
+    [Config.Items.UNCOMMON] = { name = 'Tôm Tích Xanh', image = 'images/tomtich_xanh.png' },
+    [Config.Items.RARE] = { name = 'Tôm Tích Đỏ', image = 'images/tomtich_do.png' },
+    [Config.Items.LEGENDARY] = { name = 'Tôm Tích Hoàng Kim', image = 'images/tomtich_vang.png' },
+    [Config.Items.TRASH] = { name = 'Rác thải nhựa', image = 'images/trash.png' } -- Cần có ảnh rác nếu muốn hiện
+}
+
+-- Giao diện & Độ khó (NUI)
+Config.NUI = {
+    -- ÂM THANH
+    Sounds = {
+        win = { url = 'https://assets.mixkit.co/active_storage/sfx/2000/2000-preview.mp3', volume = 0.5 },
+        lose = { url = 'https://assets.mixkit.co/active_storage/sfx/2955/2955-preview.mp3', volume = 0.4 },
+        ocean = { url = 'https://assets.mixkit.co/active_storage/sfx/2393/2393-preview.mp3', volume = 0.2 },
+        reelIn = { url = 'https://assets.mixkit.co/active_storage/sfx/2571/2571-preview.mp3', volume = 0.3 },
+        shrimpPull = { url = 'https://assets.mixkit.co/active_storage/sfx/2573/2573-preview.mp3', volume = 0.6 },
+        tension = { url = 'https://assets.mixkit.co/active_storage/sfx/2577/2577-preview.mp3', volume = 0.4 }
+    },
+    
+    -- PHASE 1: DI CHUYỂN TRONG HANG (TUNNEL)
+    Tunnel = {
+        totalDepth = 5000,       -- Độ sâu tổng cộng
+        pathWidth = 130,         -- Chiều rộng đường đi
+        warningDistance = 20,    -- Khoảng cách cảnh báo đụng tường
+        maxSpeed = 3.0,          -- Tốc độ rơi tối đa
+        acceleration = 0.1,      -- Gia tốc
+        friction = 0.2,          -- Ma sát (khi không nhấn)
+        retractSpeed = 8,        -- Tốc độ thu dây khi đụng tường
+        lerpSpeed = 0.25,        -- Độ mượt khi móc câu theo chuột
+        swayAmount = 80          -- Độ ngoằn ngoèo của hang
+    },
+    
+    -- PHASE 2: THẢ DÂY (DROPPING)
+    Dropping = {
+        dropSpeed = 40,          -- Tốc độ thả dây
+        retractSpeed = 60        -- Tốc độ thu dây (khi buông Space)
+    },
+    
+    -- PHASE 3: ĐỢI TÔM CẮN (WAITING & BITING)
+    Biting = {
+        waitMin = 5000,          -- Thời gian đợi tối thiểu (ms)
+        waitRandom = 3000,       -- Thời gian đợi ngẫu nhiên (ms)
+        biteWindow = 2000        -- Thời gian tôm cắn để giật (ms)
+    },
+    
+    -- PHASE 4: KÉO TÔM (FISHING)
+    Fishing = {
+        tensionSafeMin = 30,      -- Lực căng an toàn tối thiểu
+        tensionSafeMax = 70,      -- Lực căng an toàn tối đa
+        gameTimeLimit = 30000,    -- Thời gian tối đa (ms)
+        catchDuration = 20000,    -- Thời gian cần giữ để câu được (ms)
+        pullIntervalMin = 2000,   -- Khoảng thời gian tôm giật tối thiểu (ms)
+        pullIntervalMax = 4000,   -- Khoảng thời gian tôm giật tối đa (ms)
+        
+        -- Vật lý lực căng
+        tensionIncreaseHolding = 35,    -- Lực căng tăng khi giữ Space
+        tensionDecreaseReleased = 25,   -- Lực căng giảm khi buông Space
+        resistanceBase = 15,            -- Lực kháng cơ bản của tôm
+        progressDecreaseRate = 50,      -- Tốc độ giảm tiến trình khi ngoài vùng an toàn
+        
+        -- Ngưỡng thất bại
+        failTensionMax = 95,
+        failTensionMin = 5,
+        warningThresholdHigh = 85,
+        warningThresholdLow = 15,
+        
+        -- Độ khó theo độ hiếm
+        rarityMultipliers = {
+            tomtichhoangkim = 1.3,
+            tomtichdo = 1.1
+        }
+    }
+}
+
 -- ============================================
 -- CẤU HÌNH VÙNG CÂU TÔM TÍCH (HÌNH CHỮ NHẬT)
 -- ============================================

@@ -243,211 +243,51 @@ local activeTreasureGames = {}
 RegisterNetEvent('treasure:startGame')
 AddEventHandler('treasure:startGame', function()
     local src = source
-    
-    local gridSize = Config.Treasure.gridSize
-    local treasureCount = Config.Treasure.treasureCount
-    local minDistance = Config.Treasure.minDistance
-    
-    -- Generate treasure positions
-    local treasurePositions = {}
-    local maxAttempts = 100
-    local attempts = 0
-    
-    while #treasurePositions < treasureCount and attempts < maxAttempts do
-        attempts = attempts + 1
-        local pos = math.random(0, (gridSize * gridSize) - 1)
-        
-        -- Check if position already exists
-        local exists = false
-        for _, p in ipairs(treasurePositions) do
-            if p == pos then
-                exists = true
-                break
-            end
-        end
-        
-        if not exists then
-            -- If this is the second treasure, check distance from first
-            if #treasurePositions == 1 then
-                local firstPos = treasurePositions[1]
-                local row1 = math.floor(firstPos / gridSize)
-                local col1 = firstPos % gridSize
-                local row2 = math.floor(pos / gridSize)
-                local col2 = pos % gridSize
-                
-                -- Manhattan distance
-                local distance = math.abs(row1 - row2) + math.abs(col1 - col2)
-                
-                if distance >= minDistance then
-                    table.insert(treasurePositions, pos)
-                end
-            else
-                -- First treasure, just add it
-                table.insert(treasurePositions, pos)
-            end
-        end
-    end
-    
-    -- Fallback if couldn't find good positions
-    if #treasurePositions < treasureCount then
-        treasurePositions = {math.random(0, 11), math.random(13, 24)}
-    end
+    local Player = QBCore.Functions.GetPlayer(src)
+    if not Player then return end
     
     activeTreasureGames[src] = {
         active = true,
-        treasures = treasurePositions,
-        foundTreasures = {},
-        attempts = Config.Treasure.initialAttempts,
-        openedCells = {}
+        startTime = os.time(),
+        cid = Player.PlayerData.citizenid
     }
     
-    -- Send game data to client
+    -- Send initial state to client
     TriggerClientEvent('treasure:gameData', src, {
         attempts = Config.Treasure.initialAttempts
     })
 end)
 
-RegisterNetEvent('treasure:openCell')
-AddEventHandler('treasure:openCell', function(cellIndex)
+RegisterNetEvent('treasure:finishGame')
+AddEventHandler('treasure:finishGame', function(success)
     local src = source
     local game = activeTreasureGames[src]
     
     if not game or not game.active then return end
     
-    -- Check if already opened
-    for _, opened in ipairs(game.openedCells) do
-        if opened == cellIndex then
-            return
+    -- Basic validation: check duration
+    local duration = os.time() - game.startTime
+    if duration < 5 then -- Too fast for a 5x5 grid search
+        TriggerClientEvent('cautomtich:notification', src, nil, "⚠️ Phát hiện hành vi bất thường!")
+        activeTreasureGames[src] = nil
+        return
+    end
+    
+    game.active = false
+    
+    if success then
+        -- Grant reward
+        ox:AddItem(src, ITEMS.TREASURE, Config.Treasure.rewardAmount)           
+        TriggerClientEvent('cautomtich:notification', src, ITEMS.TREASURE, "🎉 Chúc mừng! Bạn đã nhận được kho báu!")
+        
+        -- Optional: Add EXP if defined
+        if Config.ExpRewards[ITEMS.TREASURE] then
+            AddExperience(src, Config.ExpRewards[ITEMS.TREASURE])
         end
     end
     
-    table.insert(game.openedCells, cellIndex)
-    
-    -- Check if treasure
-    local isTreasure = false
-    for _, treasurePos in ipairs(game.treasures) do
-        if treasurePos == cellIndex then
-            isTreasure = true
-            table.insert(game.foundTreasures, cellIndex)
-            game.attempts = game.attempts + 1 -- Bonus turn
-            break
-        end
-    end
-    
-    if isTreasure then
-        -- Found treasure
-        TriggerClientEvent('treasure:cellResult', src, {
-            cellIndex = cellIndex,
-            isTreasure = true,
-            attemptsLeft = game.attempts,
-            foundCount = #game.foundTreasures
-        })
-        
-        -- Check win condition
-        if #game.foundTreasures >= Config.Treasure.treasureCount then
-            -- WIN!
-            TriggerClientEvent('treasure:gameEnd', src, {
-                success = true,
-                treasures = game.treasures
-            })
-            
-            ox:AddItem(src, ITEMS.TREASURE, Config.Treasure.rewardAmount)           
-            TriggerClientEvent('cautomtich:notification', src, ITEMS.TREASURE, "🎉 Chúc mừng! Bạn đã nhận được kho báu!")
-            
-            activeTreasureGames[src] = nil
-        end
-    else
-        -- Not treasure - give hint
-        game.attempts = game.attempts - 1
-        
-        local hint = generateHint(cellIndex, game.treasures, game.foundTreasures)
-        
-        TriggerClientEvent('treasure:cellResult', src, {
-            cellIndex = cellIndex,
-            isTreasure = false,
-            hint = hint,
-            attemptsLeft = game.attempts,
-            foundCount = #game.foundTreasures
-        })
-        
-        -- Check lose condition
-        if game.attempts <= 0 and #game.foundTreasures < Config.Treasure.treasureCount then
-            -- LOSE!
-            TriggerClientEvent('treasure:gameEnd', src, {
-                success = false,
-                treasures = game.treasures
-            })
-            
-            TriggerClientEvent('cautomtich:notification', src, nil, "😔 Hết lượt! Bạn chưa tìm đủ kho báu.")
-            
-            activeTreasureGames[src] = nil
-        end
-    end
+    activeTreasureGames[src] = nil
 end)
-
--- Generate smart hint
-function generateHint(cellIndex, treasures, foundTreasures)
-    local gridSize = Config.Treasure.gridSize
-    
-    -- Convert index to row, col
-    local row = math.floor(cellIndex / gridSize)
-    local col = cellIndex % gridSize
-    
-    -- Find closest unfound treasure
-    local closestTreasure = nil
-    local minDistance = 999
-    
-    for _, treasurePos in ipairs(treasures) do
-        local alreadyFound = false
-        for _, found in ipairs(foundTreasures) do
-            if found == treasurePos then
-                alreadyFound = true
-                break
-            end
-        end
-        
-        if not alreadyFound then
-            local tRow = math.floor(treasurePos / Config.Treasure.gridSize)
-            local tCol = treasurePos % Config.Treasure.gridSize
-            local distance = math.abs(row - tRow) + math.abs(col - tCol)
-            
-            if distance < minDistance then
-                minDistance = distance
-                closestTreasure = treasurePos
-            end
-        end
-    end
-    
-    if not closestTreasure then
-        return "Không còn kho báu nào!"
-    end
-    
-    local tRow = math.floor(closestTreasure / Config.Treasure.gridSize)
-    local tCol = closestTreasure % Config.Treasure.gridSize
-    
-    local rowDiff = tRow - row
-    local colDiff = tCol - col
-    
-    -- Adjacent (ngang/dọc 1 ô) - Gần nhất
-    if (math.abs(rowDiff) == 1 and colDiff == 0) or 
-       (rowDiff == 0 and math.abs(colDiff) == 1) then
-        return "🔥 Kho báu đã gần bạn lắm rồi!"
-    end
-    
-    -- Diagonal (chéo 1 ô) - Gần
-    if math.abs(rowDiff) == 1 and math.abs(colDiff) == 1 then
-        return "🎯 Kho báu ở gần đây"
-    end
-    
-    -- Far away - give general direction
-    local directions = {}
-    if rowDiff < 0 then table.insert(directions, "Trên") end
-    if rowDiff > 0 then table.insert(directions, "Dưới") end
-    if colDiff < 0 then table.insert(directions, "Trái") end
-    if colDiff > 0 then table.insert(directions, "Phải") end
-    
-    return "📍 Xa – " .. table.concat(directions, "/")
-end
 
 RegisterNetEvent('treasure:close')
 AddEventHandler('treasure:close', function()

@@ -141,7 +141,8 @@ function OpenTomTichGame()
         
         SetNuiFocus(true, true)
         SendNUIMessage({
-            action = "showTomTich"
+            action = "showTomTich",
+            config = Config -- Gửi toàn bộ config sang JS
         })
     end, function() -- Cancel
         -- Hủy bỏ
@@ -243,7 +244,8 @@ function OpenTreasureGame(skipCooldown)
     
     SetNuiFocus(true, true)
     SendNUIMessage({
-        action = "showTreasure"
+        action = "showTreasure",
+        config = Config -- Gửi toàn bộ config sang JS
     })
 end
 
@@ -261,8 +263,8 @@ RegisterNUICallback('closeTreasure', function(data, cb)
     cb('ok')
 end)
 
-RegisterNUICallback('treasureOpenCell', function(data, cb)
-    TriggerServerEvent('treasure:openCell', data.cellIndex)
+RegisterNUICallback('treasureFinish', function(data, cb)
+    TriggerServerEvent('treasure:finishGame', data.success)
     cb('ok')
 end)
 
@@ -274,16 +276,9 @@ AddEventHandler('treasure:gameData', function(data)
     })
 end)
 
-RegisterNetEvent('treasure:cellResult')
-AddEventHandler('treasure:cellResult', function(data)
-    SendNUIMessage({
-        action = "treasureCellResult",
-        data = data
-    })
-end)
-
 RegisterNetEvent('treasure:gameEnd')
 AddEventHandler('treasure:gameEnd', function(data)
+    -- This event might still be used for forced end, but normally UI handles it
     SendNUIMessage({
         action = "treasureGameEnd",
         data = data
