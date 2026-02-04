@@ -1,29 +1,66 @@
-QBCore = exports["qb-core"]:GetCoreObject()
+QBCore = exports['qb-core']:GetCoreObject()
 ok = exports['o-protection']
 no = exports['f17notify']
 ox = exports.ox_inventory
 
 Config = {}
+Config.StartEvent = false
 
--- ============================================
--- CẤU HÌNH ITEMS
--- ============================================
 Config.Items = {
-    TRASH = "racthainhua",
-    COMMON = "tomtich",
-    UNCOMMON = "tomtichxanh",
-    RARE = "tomtichdo",
-    LEGENDARY = "tomtichhoangkim",
-    TREASURE = "khobau"
+    TRASH = { id = "vechai", name = 'Ve chai', image = 'images/vechai.png' },
+    COMMON = { id = "tomtit", name = 'Tôm Tít', image = 'images/tomtit.png' },
+    UNCOMMON = { id = "tomtitxanh", name = 'Tôm Tít Xanh', image = 'images/tomtitxanh.png' },
+    RARE = { id = "tomtitdo", name = 'Tôm Tít Đỏ', image = 'images/tomtitdo.png' },
+    LEGENDARY = { id = "tomtithoangkim", name = 'Tôm Tít Hoàng Kim', image = 'images/tomtithoangkim.png' },
+    TREASURE = { id = "khobau", name = 'Kho báu', image = 'images/khobau.png' }
 }
 
--- Thông tin hiển thị trên NUI
-Config.NUIItems = {
-    [Config.Items.COMMON] = { name = 'Tôm Tích', image = 'images/tomtich.png' },
-    [Config.Items.UNCOMMON] = { name = 'Tôm Tích Xanh', image = 'images/tomtich_xanh.png' },
-    [Config.Items.RARE] = { name = 'Tôm Tích Đỏ', image = 'images/tomtich_do.png' },
-    [Config.Items.LEGENDARY] = { name = 'Tôm Tích Hoàng Kim', image = 'images/tomtich_vang.png' },
-    [Config.Items.TRASH] = { name = 'Rác thải nhựa', image = 'images/trash.png' } -- Cần có ảnh rác nếu muốn hiện
+Config.Level = 10
+Config.Levels = {
+    Level1 = {
+        NeedLevels = 10,
+        JobPoint = 0,
+        expRequired = 0,
+        rates = {
+            [Config.Items.COMMON.id] = 60,      -- Tôm thường: 60%
+            [Config.Items.UNCOMMON.id] = 40,    -- Tôm xanh: 40%
+            [Config.Items.RARE.id] = 0,
+            [Config.Items.LEGENDARY.id] = 0
+        }
+    },
+    Level2 = {
+        NeedLevels = 40,
+        JobPoint = 700,
+        expRequired = 50,
+        rates = {
+            [Config.Items.COMMON.id] = 20,      -- Tôm thường: 20%
+            [Config.Items.UNCOMMON.id] = 40,    -- Tôm xanh: 40%
+            [Config.Items.RARE.id] = 40,        -- Tôm đỏ: 40%
+            [Config.Items.LEGENDARY.id] = 0
+        }
+    },
+    Level3 = {
+        NeedLevels = 75,
+        JobPoint = 1400,
+        expRequired = 100,
+        rates = {
+            [Config.Items.COMMON.id] = 25,      -- Tôm thường: 25%
+            [Config.Items.UNCOMMON.id] = 35,    -- Tôm xanh: 35%
+            [Config.Items.RARE.id] = 30,        -- Tôm đỏ: 30%
+            [Config.Items.LEGENDARY.id] = 10    -- Tôm vàng: 10%
+        }
+    },
+}
+
+Config.RestrictedJobs = {
+    ['police'] = true,
+    ['ambulance'] = true
+}
+
+Config.Location = {
+    coords = vector4(-164.6, 6663.67, 1.41, 47.12),
+    size = vector3(100.0, 75.0, 10),
+    rotation = 47.12
 }
 
 -- Giao diện & Độ khó (NUI)
@@ -87,25 +124,11 @@ Config.NUI = {
         
         -- Độ khó theo độ hiếm
         rarityMultipliers = {
-            tomtichhoangkim = 1.3,
-            tomtichdo = 1.1
+            tomtithoangkim = 1.3,
+            tomtitdo = 1.1
         }
     }
 }
-
--- ============================================
--- CẤU HÌNH VÙNG CÂU TÔM TÍCH (HÌNH CHỮ NHẬT)
--- ============================================
-Config.TomTichZone = {
-    coords = vector3(-282.18, 6547.14, 2.59), -- Tọa độ trung tâm vùng
-    size = vector3(30.0, 25.0, 15), -- Kích thước (dài x rộng x cao/sâu)
-    rotation = 0 -- Góc xoay (0-360)
-    -- Lưu ý: 
-    -- - size.x = chiều dài (length)
-    -- - size.y = chiều rộng (width)
-    -- - size.z = chiều cao/sâu (height) - tăng lên nếu địa hình có độ cao thấp khác nhau
-}
-
 
 -- ============================================
 -- CẤU HÌNH THỜI GIAN & KHOẢNG CÁCH
@@ -122,57 +145,13 @@ Config.Marker = {
         type = 1,
         size = {x = 1.5, y = 1.5, z = 1.0},
         color = {r = 0, g = 255, b = 150, a = 150},
-        text = "[~g~E~w~] Câu Tôm Tích"
+        text = "[~g~E~w~] Câu Tôm Tít"
     },
     Cooldown = {
         type = 1,
         size = {x = 1.5, y = 1.5, z = 1.0},
         color = {r = 255, g = 0, b = 0, a = 150}
     }
-}
-
--- ============================================
--- CẤU HÌNH LEVEL & TỶ LỆ RƠI
--- ============================================
-Config.LevelConfig = {
-    [1] = {
-        expRequired = 0,
-        rates = {
-            [Config.Items.COMMON] = 60,      -- Tôm thường: 60%
-            [Config.Items.UNCOMMON] = 40,    -- Tôm xanh: 40%
-            [Config.Items.RARE] = 0,
-            [Config.Items.LEGENDARY] = 0
-        }
-    },
-    [2] = {
-        expRequired = 50,
-        rates = {
-            [Config.Items.COMMON] = 20,      -- Tôm thường: 20%
-            [Config.Items.UNCOMMON] = 40,    -- Tôm xanh: 40%
-            [Config.Items.RARE] = 40,        -- Tôm đỏ: 40%
-            [Config.Items.LEGENDARY] = 0
-        }
-    },
-    [3] = {
-        expRequired = 100,
-        rates = {
-            [Config.Items.COMMON] = 25,      -- Tôm thường: 25%
-            [Config.Items.UNCOMMON] = 35,    -- Tôm xanh: 35%
-            [Config.Items.RARE] = 30,        -- Tôm đỏ: 30%
-            [Config.Items.LEGENDARY] = 10    -- Tôm vàng: 10%
-        }
-    }
-}
-
--- ============================================
--- CẤU HÌNH EXP NHẬN ĐƯỢC
--- ============================================
-Config.ExpRewards = {
-    [Config.Items.COMMON] = 50,
-    [Config.Items.UNCOMMON] = 50,
-    [Config.Items.RARE] = 50,
-    [Config.Items.LEGENDARY] = 50,
-    [Config.Items.TREASURE] = 100
 }
 
 -- ============================================
@@ -196,17 +175,4 @@ Config.Treasure = {
     rewardAmount = 1, -- Số lượng kho báu nhận được khi thắng
     maxPerHour = 2, -- Giới hạn tối đa 2 rương/giờ
     hourWindow = 3600 -- 1 giờ = 3600 giây
-}
-
--- ============================================
--- CẤU HÌNH ANIMATION
--- ============================================
-Config.Animation = {
-    dict = "amb@world_human_stand_fishing@idle_a",
-    name = "idle_c"
-}
-
-Config.DiggingAnimation = {
-    dict = "amb@world_human_gardener_plant@male@base",
-    name = "base"
 }

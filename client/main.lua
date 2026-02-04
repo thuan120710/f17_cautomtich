@@ -1,260 +1,75 @@
--- Lấy config từ file config.lua
-local TOMTICH_ZONE = Config.TomTichZone
-local SPAWN_COOLDOWN = 180 -- 180 giây cooldown
-
--- Trạng thái minigame tôm tích
-local isTomTichActive = false
-local lastPlayPosition = nil -- Vị trí chơi lần cuối
-local MIN_DISTANCE_BETWEEN_PLAYS = 5.0 -- Khoảng cách tối thiểu giữa các lần chơi (đơn vị: bước chân)
-
--- Trạng thái minigame kho báu
+local inZoneTomTit = false
+local onJobTomTit = false
+local checkSpawn = false
+local clCooldown = 0
+local timeCooldown = 180000
+local lastSuccessTime = 0
+local lastPosition = nil
+local maxDistance = 5.0
+local isWorking = false
 local isTreasureActive = false
+local treasureObj = nil
 
--- Player level
-local playerLevel = 1
-
--- Dừng animation (Helper)
-local function StopScratchAnimation()
-    local playerPed = PlayerPedId()
-    ClearPedTasks(playerPed)
-end
-
--- ============================================
--- NOTIFICATION HELPER
--- ============================================
--- Nhận thông báo
-RegisterNetEvent('cautomtich:notification')
-AddEventHandler('cautomtich:notification', function(item, reason)
-    local messages = {
-        tomtich_success = "🎉 Chúc mừng! Bạn đã câu được Tôm Tích!",
-        tomtich_fail = "😔 Thất bại! Bạn nhận được Rác thải nhựa"
-    }
-    
-    local message = messages[reason] or reason or "Bạn đã nhận được phần thưởng!"
-    no:Notify(message, 'success', 5000)
-end)
-
--- Nhận cập nhật level từ server
-RegisterNetEvent('tomtich:updateLevel')
-AddEventHandler('tomtich:updateLevel', function(level, exp)
-    playerLevel = level
-    SendNUIMessage({
-        action = "updateLevel",
-        level = level,
-        exp = exp
-    })
-end)
-
--- ✅ Event mới: Cho phép mở UI sau khi server xác nhận OK
-RegisterNetEvent('tomtich:allowOpenUI')
-AddEventHandler('tomtich:allowOpenUI', function()
-    -- Mở UI minigame
-    SetNuiFocus(true, true)
-    SendNUIMessage({
-        action = "showTomTich",
-        config = Config
-    })
-end)
-
--- Callback từ NUI
-RegisterNUICallback('closeTomTich', function(data, cb)
-    CloseTomTichGame()
-    cb('ok')
-end)
-
--- Hàm vẽ text 3D
-function DrawText3D(x, y, z, text)
-    local onScreen, _x, _y = World3dToScreen2d(x, y, z)
-    local px, py, pz = table.unpack(GetGameplayCamCoords())
-    
-    SetTextScale(0.35, 0.35)
-    SetTextFont(4)
-    SetTextProportional(1)
-    SetTextColour(255, 255, 255, 215)
-    SetTextEntry("STRING")
-    SetTextCentre(1)
-    AddTextComponentString(text)
-    DrawText(_x, _y)
-    local factor = (string.len(text)) / 370
-    DrawRect(_x, _y + 0.0125, 0.015 + factor, 0.03, 0, 0, 0, 75)
-end
-
-
--- ============================================
--- MINIGAME TÔM TÍCH
--- ============================================
-
--- Animation đào cát
-local function PlayDiggingAnimation()
-    local playerPed = PlayerPedId()
-    
-    RequestAnimDict(Config.DiggingAnimation.dict)
-    while not HasAnimDictLoaded(Config.DiggingAnimation.dict) do
-        Citizen.Wait(100)
-    end
-    
-    TaskPlayAnim(playerPed, Config.DiggingAnimation.dict, Config.DiggingAnimation.name, 8.0, -8.0, -1, 1, 0, false, false, false)
-end
-
--- Mở UI tôm tích
-function OpenTomTichGame()
-    if isTomTichActive then
-        return
-    end
-    
-    local playerPed = PlayerPedId()
-    local playerCoords = GetEntityCoords(playerPed)
-    
-    -- Kiểm tra vị trí (tránh đứng 1 chỗ chơi liên tục)
-    if lastPlayPosition then
-        local distance = #(playerCoords - lastPlayPosition)
-        if distance < MIN_DISTANCE_BETWEEN_PLAYS then
-            TriggerEvent('cautomtich:notification', nil, "🦐 Tôm ở đây đã bắt hết rồi! Hãy di chuyển sang chỗ khác.")
-            return
+-- Zone
+ZoneTomTit = lib.zones.poly({
+    points = {
+        vec3(-264.81, 6510.32, 1.66),
+        vec3(-317.49, 6547.39, 1.66),
+        vec3(-276.09, 6603.08, 1.66),
+        vec3(-226.06, 6560.96, 1.66)
+    },
+    thickness = 10.0,
+    debug = false,
+    onEnter = function()
+        inZoneTomTit = true
+        no:Notify("Bạn đã vào khu vực câu tôm tít", "success", 5000)
+        if onJobTomTit then
+            lib.showTextUI('showTextUI', {position = 'bottom-center', icon = 'fa-solid fa-shrimp', iconColor = 'white', style = { borderRadius = 5, backgroundColor = 'rgba(0, 0, 0, 0.8)', color = 'white' }})
         end
+    end,
+    inside = function()
+        if onJobTomTit and not isWorking then
+            if IsControlJustPressed(0, 38) then
+                TriggerEvent("f17_tomtit:cl:Start")
+            end
+        end
+    end,
+    onExit = function()
+        if inZoneTomTit then
+            no:Notify("Bạn đã rời khỏi khu vực câu tôm tít!", "error", 1500)
+        end
+        inZoneTomTit = false
+        lib.hideTextUI()
     end
-    
-    isTomTichActive = true
-    
-    -- ✅ GỬI REQUEST KIỂM TRA COOLDOWN NGAY KHI BẮT ĐẦU ĐÀO
-    -- Server sẽ trả về allowDig (true/false)
-    TriggerServerEvent('tomtich:checkCooldown')
-    
-    -- Hiển thị progress bar đào cát
-    PlayDiggingAnimation()
-    
-    local diggingTime = math.random(10000, 15000) -- 10-15 giây
-    
-    QBCore.Functions.Progressbar("digging_sand", "🏖️ Đang đào cát tìm tôm...", diggingTime, false, true, {
-        disableMovement = true,
-        disableCarMovement = true,
-        disableMouse = false,
-        disableCombat = true,
-    }, {}, {}, {}, function() -- Done
-        -- Hoàn thành đào cát
-        StopScratchAnimation()
-        
-        -- Lưu vị trí chơi
-        lastPlayPosition = playerCoords
-        
-        -- ✅ Gửi request lên server để mở UI (server đã lưu cooldown từ lúc checkCooldown)
-        TriggerServerEvent('tomtich:finishDigging')
-    end, function() -- Cancel
-        -- Hủy bỏ
-        StopScratchAnimation()
-        isTomTichActive = false
-        TriggerEvent('cautomtich:notification', nil, "❌ Đã hủy đào cát")
-        -- Hủy cooldown nếu cancel
-        TriggerServerEvent('tomtich:cancelDigging')
-    end)
+})
+
+--Function
+local function StopTomTit()
+	checkSpawn = false
+	onJobTomTit = false
+	TriggerServerEvent("f17-core:server:KetThucLamViec")
+    no:Notify("Bạn đã kết thúc công việc thành công!", "error", 5000)
+    lib.hideTextUI()
 end
-
--- Đóng UI tôm tích
-function CloseTomTichGame()
-    isTomTichActive = false
-    SetNuiFocus(false, false)
-    SendNUIMessage({
-        action = "hideTomTich"
-    })
-    
-    StopScratchAnimation()
-end
-
--- Command test
-RegisterCommand('tomtich', function()
-    OpenTomTichGame()
-end, false)
-
-RegisterCommand('treasure', function()
-    -- Bỏ check level để test
-    OpenTreasureGame(true)  -- Skip cooldown cho test command
-end, false)
-
--- Command test trigger event kho báu
-RegisterCommand('testtreasureevent', function()
-    TriggerEvent('tomtich:showTreasureAfterGame')
-end, false)
-
--- Command để set level test
-RegisterCommand('setlevel', function(source, args)
-    local level = tonumber(args[1]) or 1
-    playerLevel = math.min(3, math.max(1, level))
-    TriggerEvent('cautomtich:notification', nil, "Đã set level: " .. playerLevel)
-end, false)
-
--- Nhận kết quả từ server
-RegisterNetEvent('tomtich:gameResult')
-AddEventHandler('tomtich:gameResult', function(success, item)
-    -- ✅ Đảm bảo game đang active trước khi gửi kết quả
-    if not isTomTichActive then
-        return
-    end
-    
-    SendNUIMessage({
-        action = "tomtichResult",
-        success = success,
-        item = item
-    })
-    
-    -- Không tự động đóng nữa - để server quyết định
-    -- Citizen.SetTimeout(3000, function()
-    --     CloseTomTichGame()
-    -- end)
-end)
-
--- Nhận sự kiện hiển thị kho báu sau khi câu tôm thành công (Level 3)
-RegisterNetEvent('tomtich:showTreasureAfterGame')
-AddEventHandler('tomtich:showTreasureAfterGame', function()
-    -- Đóng UI tôm tích trước
-    CloseTomTichGame()
-    
-    -- Hiển thị thông báo
-    TriggerEvent('cautomtich:notification', nil, "🎉 Phát hiện Kho Báu gần đây! Hãy đào ngay!")
-    
-    -- Delay 1 giây rồi mở minigame kho báu (SKIP COOLDOWN vì đây là reward)
-    Citizen.SetTimeout(1000, function()
-        OpenTreasureGame(true)  -- true = skip cooldown
-    end)
-end)
-
--- Event đóng UI tôm tích sau 3 giây (để chờ xem kết quả)
-RegisterNetEvent('tomtich:closeUI')
-AddEventHandler('tomtich:closeUI', function()
-    Citizen.SetTimeout(3000, function()
-        CloseTomTichGame()
-    end)
-end)
-
--- Event đóng UI tôm tích ngay lập tức (thường gọi sau khi server đã chờ đủ 3s)
-RegisterNetEvent('tomtich:closeUI_immediate')
-AddEventHandler('tomtich:closeUI_immediate', function()
-    isTomTichActive = false -- ✅ Đảm bảo reset trạng thái
-    CloseTomTichGame()
-end)
-
--- Callback từ NUI
-RegisterNUICallback('tomtichAttempt', function(data, cb)
-    TriggerServerEvent('tomtich:attempt', data.success, data.item, data.customMessage)
-    cb('ok')
-end)
-
--- ============================================
--- MINIGAME KHO BÁU
--- ============================================
 
 function OpenTreasureGame(skipCooldown)
-    if isTreasureActive then
-        return
-    end
-    
+    -- if not onJobTomTit or isTreasureActive then return end
     isTreasureActive = true
-    
-    TriggerServerEvent('treasure:startGame')
-    
+
+    local treasureConfig = {
+        NUI = {
+            Sounds = Config.NUI.Sounds,
+            Treasure = Config.Treasure
+        }
+    }
+
     SetNuiFocus(true, true)
     SendNUIMessage({
         action = "showTreasure",
-        config = Config -- Gửi toàn bộ config sang JS
+        config = treasureConfig,
+        data = {
+            attempts = Config.Treasure.initialAttempts
+        }
     })
 end
 
@@ -264,8 +79,41 @@ function CloseTreasureGame()
     SendNUIMessage({
         action = "hideTreasure"
     })
-    TriggerServerEvent('treasure:close')
 end
+
+local function playAnimation()
+    local ped = PlayerPedId()
+    lib.requestAnimDict("amb@world_human_gardener_plant@male@base")
+    TaskPlayAnim(ped, "amb@world_human_gardener_plant@male@base", "base", 8.0, -8.0, -1, 1, 0, false, false, false)
+
+end
+
+local function stopAnimation()
+    local ped = PlayerPedId()
+    ClearPedTasks(ped)
+end
+
+function CloseTomTitGame()
+    isWorking = false
+    SetNuiFocus(false, false)
+    SendNUIMessage({
+        action = "hideTomTit"
+    })
+
+    stopAnimation()
+end
+
+--Callback
+RegisterNUICallback('closeTomTit', function(data, cb)
+    CloseTomTitGame()
+    cb('ok')
+end)
+
+RegisterNUICallback('tomtitReward', function(data, cb)
+    print('tomtitReward', json.encode(data))
+    TriggerServerEvent('f17_tomtit:sv:reward', data)
+    cb('ok')
+end)
 
 RegisterNUICallback('closeTreasure', function(data, cb)
     CloseTreasureGame()
@@ -273,58 +121,285 @@ RegisterNUICallback('closeTreasure', function(data, cb)
 end)
 
 RegisterNUICallback('treasureFinish', function(data, cb)
-    TriggerServerEvent('treasure:finishGame', data.success)
+    TriggerServerEvent('treasure:finishGame', data.success, data.item)
     cb('ok')
 end)
 
-RegisterNetEvent('treasure:gameData')
-AddEventHandler('treasure:gameData', function(data)
+--Event
+RegisterNetEvent("f17_tomtit:cl:OpenJobsMenu", function()
+    local dlv = QBCore.Functions.GetPlayerData().metadata.danglamviec
+	if dlv == "none" or dlv == "Tôm Tít" then
+		TriggerEvent("f17-jobs:cl:OpenJobsMenu", "tomtit")
+	else
+		no:Notify("Bạn đang làm việc "..dlv..", vui lòng kết thúc công việc trước khi tương tác nghề mới!", "error", 5000)
+	end
+end)
+
+RegisterNetEvent("f17_tomtit:cl:DoJob", function(cb)
+	if onJobTomTit then
+		no:Notify("Bạn đang làm việc, không thể nhận việc!", "primary", 5000)
+		cb(false)
+		return
+	end
+	
+	if IsRestrictedJob(PlayerJob.name) then
+		no:Notify("Bạn đang là người ban ngành, không thể nhận việc!", "error", 5000)
+        cb(false)
+		return
+    end
+    
+    if Player(GetPlayerServerId(PlayerId())).state.level < Config.Level then
+		no:Notify("Bạn chưa đủ level để nhận việc! Yêu cầu level: "..Config.Level, "error", 5000)
+        cb(false)
+		return
+    end
+
+    TriggerServerEvent('f17_tomtit:sv:DoJob')
+	TriggerServerEvent("f17-core:server:BatDauLamViec", "Tôm Tít")
+	onJobTomTit = true
+	no:Notify("Bạn đã bắt đầu công việc Câu Tôm Tít, hãy sử dụng 'Dây câu tôm' để bắt đầu làm việc!", "success", 10000)
+    if inZoneTomTit then
+        lib.showTextUI('[E] Đào cát tìm tôm', {position = 'bottom-center', icon = 'fa-solid fa-shrimp', iconColor = 'white', style = { borderRadius = 5, backgroundColor = 'rgba(0, 0, 0, 0.8)', color = 'white' }})
+    end
+	cb(true)
+end)
+
+RegisterNetEvent("f17_tomtit:cl:CancelJob", function()
+	StopTomTit()
+end)
+
+RegisterNetEvent("f17_tomtit:cl:NangCapNghe", function(cb)
+	local result = lib.callback.await("f17_tomtit:sv:NangCapNghe", false)
+	cb(result)
+end)
+
+RegisterNetEvent("f17_tomtit:cl:Start")
+AddEventHandler("f17_tomtit:cl:Start", function()
+	if not onJobTomTit then
+		no:Notify("Bạn chưa bắt đầu công việc Câu Tôm Tít, hãy tương tác NPC Tôm Tít!", "error", 5000)
+		return
+	end
+
+    if not inZoneTomTit then
+        no:Notify("Bạn không ở trong khu vực đào cát", "error", 5000)
+        return
+    end
+
+	if checkSpawn then
+        no:Notify("Bạn đang thao tác quá nhanh, có lẽ bạn nên sống chậm lại", "primary", 3000)
+        return
+    end
+ 
+    if IsRestrictedJob(PlayerJob.name) then
+        no:Notify("Bạn đang là người ban ngành, không thể nhận việc!", "error", 5000)
+        return
+    end
+
+    OpenTomTitGame()
+end)
+
+local levelCache = {}
+
+local function GetMinimizedConfig(level)
+    if levelCache[level] then
+        return levelCache[level]
+    end
+
+    local filteredConfig = {}
+    
+    filteredConfig.NUI = Config.NUI
+    filteredConfig.ShrimpList = {}
+    
+    local currentLevelData = Config.Levels['Level'..level]
+    if currentLevelData and currentLevelData.rates then
+        for itemId, rate in pairs(currentLevelData.rates) do
+            if rate > 0 then
+                local itemInfo = nil
+                for _, data in pairs(Config.Items) do
+                    if data.id == itemId then
+                        itemInfo = data
+                        break
+                    end
+                end
+                
+                if itemInfo then
+                    table.insert(filteredConfig.ShrimpList, {
+                        id = itemInfo.id,
+                        name = itemInfo.name,
+                        image = itemInfo.image,
+                        chance = rate
+                    })
+                end
+            end
+        end
+    end
+    
+    levelCache[level] = filteredConfig
+    return filteredConfig
+end
+
+RegisterNetEvent('f17_tomtit:cl:OpenTomTitGame')
+AddEventHandler('f17_tomtit:cl:OpenTomTitGame', function(svLevel)
+    SetNuiFocus(true, true)
+    local minConfig = GetMinimizedConfig(svLevel)
     SendNUIMessage({
-        action = "treasureGameData",
-        data = data
+        action = "showTomTit",
+        config = minConfig,
+        level = svLevel,
     })
 end)
 
-RegisterNetEvent('treasure:gameEnd')
-AddEventHandler('treasure:gameEnd', function(data)
-    -- This event might still be used for forced end, but normally UI handles it
-    SendNUIMessage({
-        action = "treasureGameEnd",
-        data = data
-    })
+function OpenTomTitGame()
+    -- if not onJobTomTit or isWorking then return end
+    isWorking = true
     
-    Citizen.SetTimeout(5000, function()
-        CloseTreasureGame()
+    local ped = PlayerPedId()
+    local coords = GetEntityCoords(ped)
+    local startTime = GetGameTimer()
+
+    playAnimation()
+    QBCore.Functions.Progressbar("digging_sand", "🏖️Đang đào cát tìm tôm", math.random(10000, 15000), false, true, {
+        disableMovement = true,
+        disableCarMovement = true,
+        disableMouse = false,
+        disableCombat = true,
+    }, {}, {}, {}, function() -- Done
+        stopAnimation()
+
+        if (startTime - lastSuccessTime) < timeCooldown then
+            if lastPosition then
+                local distance = #(coords - lastPosition)
+                if distance < maxDistance then
+                    no:Notify("Tôm chỗ này đã bị bắt mất rồi", 'error', 3000)
+                else
+                    no:Notify("Hình như chỗ này không có tôm. Hãy tìm chỗ khác xem sao", 'error', 3000)
+                end
+            else
+                 no:Notify("Hình như chỗ này không có tôm. Hãy tìm chỗ khác xem sao", 'error', 3000)
+            end
+            
+            isWorking = false
+            return
+        end
+        
+        lastPosition = coords
+        lastSuccessTime = startTime
+        
+        TriggerServerEvent('f17_tomtit:sv:checkCooldown', lastPosition)
+    end, function() -- Cancel
+        stopAnimation()
+        isWorking = false
+        no:Notify("Đã hủy bỏ hành động..", 'error', 3000)
+    end)
+end
+
+RegisterNetEvent('f17_tomtit:cl:closeUI')
+AddEventHandler('f17_tomtit:cl:closeUI', function()
+    SetTimeout(3000, function()
+        CloseTomTitGame()
     end)
 end)
 
--- Tạo 1 vùng zone lớn cho câu tôm (hình chữ nhật)
-Citizen.CreateThread(function()
-    local zone = lib.zones.box({
-        coords = TOMTICH_ZONE.coords,
-        size = TOMTICH_ZONE.size,
-        rotation = TOMTICH_ZONE.rotation,
-        debug = true, -- Bật debug để hiển thị viền zone
-        inside = function()
-            if IsControlJustReleased(0, 38) then -- Phím E
-                OpenTomTichGame()
-            end
-        end,
-        onEnter = function()
-            lib.showTextUI('[E] Đào cát tìm tôm', {
-                position = "top-center",
-                icon = 'hand',
-                style = {
-                    borderRadius = 5,
-                    backgroundColor = '#48BB78',
-                    color = 'white'
-                }
-            })
-        end,
-        onExit = function()
-            lib.hideTextUI()
-        end
-    })
+RegisterNetEvent('f17_tomtit:cl:updateCooldown')
+AddEventHandler('f17_tomtit:cl:updateCooldown', function(remainingMs)
+    clCooldown = GetGameTimer() - (180000 - remainingMs)
 end)
 
 
+local function SpawnTreasureChest(coords)
+    local model = `ws_premium_airdropdoom`
+    lib.requestModel(model)
+
+    local obj = CreateObject(model, coords.x, coords.y, coords.z, true, true, false) 
+    if DoesEntityExist(obj) then
+        treasureObj = obj
+        local netId = ObjToNet(obj)
+        TriggerServerEvent('f17_tomtit:sv:RegisterTreasure', netId)
+    end
+    SetEntityHeading(obj, 0.0)
+    
+    PlaceObjectOnGroundProperly(obj)
+    local finalPos = GetEntityCoords(obj)
+    
+    local startZ = finalPos.z - 1.5
+    SetEntityCoords(obj, finalPos.x, finalPos.y, startZ, 0.0, 0.0, 0.0, false)
+    FreezeEntityPosition(obj, true)
+    
+    CreateThread(function()
+        local currentZ = startZ
+        while DoesEntityExist(obj) and currentZ < finalPos.z do
+            currentZ = currentZ + 0.02
+            if currentZ > finalPos.z then currentZ = finalPos.z end
+            
+            SetEntityCoords(obj, finalPos.x, finalPos.y, currentZ, 0.0, 0.0, 0.0, false)
+            Wait(10)
+        end
+        if DoesEntityExist(obj) then
+            PlaceObjectOnGroundProperly(obj)
+        end
+    end)
+
+    CreateThread(function()
+        local sleep = 1000
+        while DoesEntityExist(obj) do
+            local ped = PlayerPedId()
+            local pCoords = GetEntityCoords(ped)
+            local dist = #(pCoords - finalPos)
+
+            if dist < 5.0 then
+                sleep = 0
+                DrawText3D(finalPos.x, finalPos.y, finalPos.z + 0.5, 'Ấn ~g~[E]~w~ để mở kho báu')
+                if dist < 2.0 then
+                    if IsControlJustPressed(0, 38) and not isTreasureActive then
+                        NetworkRequestControlOfEntity(obj)
+                        while not NetworkHasControlOfEntity(obj) do
+                            Wait(10)
+                        end
+                        DeleteEntity(obj)
+                        OpenTreasureGame(true)
+                        break
+                    end
+                end
+            end
+            Wait(sleep)
+        end
+    end)
+end
+
+RegisterNetEvent('f17_tomtit:cl:showTreasureAfterGame')
+AddEventHandler('f17_tomtit:cl:showTreasureAfterGame', function()
+    CloseTomTitGame() 
+    
+    local ped = PlayerPedId()
+    local pCoords = GetEntityCoords(ped)
+    
+    local offsetX = (math.random() * 4) - 2
+    local offsetY = (math.random() * 4) - 2
+    local spawnCoords = vector3(pCoords.x + offsetX, pCoords.y + offsetY, pCoords.z)
+    
+    no:Notify("🎉 Phát hiện Kho Báu gần đây! Hãy đào ngay!", 'success', 5000)
+    SpawnTreasureChest(spawnCoords)
+end)
+
+-- Command test
+RegisterCommand('tomtit', function()
+    OpenTomTitGame()
+end, false)
+
+RegisterCommand('treasure', function()
+    OpenTreasureGame(true)
+end, false)
+
+RegisterCommand('testtreasureevent', function()
+    TriggerEvent('f17_tomtit:cl:showTreasureAfterGame')
+end, false)
+
+AddEventHandler('onResourceStop', function(resourceName)
+    if (GetCurrentResourceName() ~= resourceName) then
+      return
+    end
+    if treasureObj and DoesEntityExist(treasureObj) then
+        DeleteEntity(treasureObj)
+    end
+    lib.hideTextUI()
+end)

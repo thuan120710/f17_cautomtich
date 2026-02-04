@@ -1,346 +1,309 @@
--- Lấy config từ file config.lua
 local ITEMS = Config.Items
-local LEVEL_CONFIG = Config.LevelConfig
-local EXP_REWARDS = Config.ExpRewards
+local DATA = {}
 
--- Hệ thống Level
-local playerLevels = {} -- {[playerId] = level}
-local playerExperience = {} -- {[playerId] = exp}
-local playerCooldownTimes = {} -- {[cid] = lastPlayTime} - Dùng CID để tránh reset khi outgame
-
--- Hàm lấy level của người chơi
-local function GetPlayerLevel(playerId)
-    if not playerLevels[playerId] then
-        playerLevels[playerId] = 1
-        playerExperience[playerId] = 0
-    end
-    return playerLevels[playerId]
-end
-
--- Hàm lấy exp của người chơi
-local function GetPlayerExp(playerId)
-    if not playerExperience[playerId] then
-        playerExperience[playerId] = 0
-    end
-    return playerExperience[playerId]
-end
-
--- Hàm thêm exp và kiểm tra level up
-local function AddExperience(playerId, exp)
-    local currentExp = GetPlayerExp(playerId)
-    local currentLevel = GetPlayerLevel(playerId)
+lib.callback.register("f17_tomtit:sv:NangCapNghe", function(source)
+    local src = source
+    local xPlayer = QBCore.Functions.GetPlayer(src)
+    if not xPlayer then return false end
+    local cid = xPlayer.PlayerData.citizenid
+    local namePlayer = Player(src).state.name
     
-    currentExp = currentExp + exp
-    playerExperience[playerId] = currentExp
+    local p = promise.new()
     
-    -- Kiểm tra level up
-    local nextLevel = currentLevel + 1
-    if LEVEL_CONFIG[nextLevel] and currentExp >= LEVEL_CONFIG[nextLevel].expRequired then
-        playerLevels[playerId] = nextLevel
-        TriggerClientEvent('cautomtich:notification', playerId, nil, 
-            string.format("🎉 LEVEL UP! Bạn đã đạt Level %d!", nextLevel))
-        return true, nextLevel
+    MySQL.query("SELECT tomtit_lvl, tomtit_currentcount FROM f17_joblevel WHERE citizenid = ?", {cid}, function(result)
+        if result and result[1] then
+            local lvl = result[1].tomtit_lvl
+            local count = result[1].tomtit_currentcount
+            p:resolve({level = lvl, count = count})
+        else
+            p:resolve({level = 1, count = 0})
+        end
+    end)
+    
+    local data = Citizen.Await(p)
+    local jobLevel = data.level
+    local jobPoint = data.count
+
+    if not jobLevel or not jobPoint then
+        no:Notify(src, "[Tôm Tít] Dữ liệu nghề không tồn tại", "error", 5000)
+        return false
     end
     
-    return false, currentLevel
-end
+    local nextLevel = jobLevel + 1
+    local levelConfig = Config.Levels['Level'..nextLevel]
 
--- Hàm random tôm theo level
-local function GetRandomShrimpByLevel(level)
-    local rates = LEVEL_CONFIG[level].rates
-    local rand = math.random(1, 100)
-    local cumulative = 0
+    if not levelConfig then return false end
+    if Player(src).state.level < levelConfig.NeedLevels then
+        no:Notify(src, string.format("[Tôm Tít] Bạn chưa đủ level để nâng cấp nghề (Yêu cầu LV %s)", levelConfig.NeedLevels), "primary", 5000)
+        return false
+    end
+    if jobPoint < levelConfig.JobPoint then
+        no:Notify(src, "[Tôm Tít] Bạn chưa đủ điểm để nâng cấp nghề", "primary", 5000)
+        return false
+    end
+
+    if nextLevel == 3 then exports['f17_leaderboard']:UpdateAchivement(src, 'leveljobactive', 1) end
+    MySQL.update("UPDATE f17_joblevel SET tomtit_lvl = ?, tomtit_currentcount = 0 WHERE citizenid = ?", {nextLevel, cid})
     
-    for item, chance in pairs(rates) do
-        cumulative = cumulative + chance
-        if rand <= cumulative then
-            return item
+    if DATA[cid] then
+        DATA[cid].level = nextLevel
+        DATA[cid].count = 0
+    end
+    
+    no:Notify(src, string.format("Bạn đã hoàn thành nhiệm vụ nâng cấp TÔM TÍT %d", nextLevel), "success", 30000)
+    TriggerEvent("qb-log:server:CreateLog", "nangcapnghe", string.format("%s HOÀN THÀNH NÂNG CẤP NGHỀ TÔM TÍT %d", cid, nextLevel), "green", string.format("Tên: **%s**\nID: %s\nLevel hiện tại: %s", namePlayer, src, Player(src).state.level))
+
+    return true
+end)
+
+
+
+RegisterNetEvent('f17_tomtit:sv:DoJob', function()
+    local src = source
+    local xPlayer = QBCore.Functions.GetPlayer(src)
+    if not xPlayer then return end
+    local cid = xPlayer.PlayerData.citizenid
+
+    MySQL.single("SELECT tomtit_lvl, tomtit_currentcount FROM f17_joblevel WHERE citizenid = ?", {cid}, function(result)
+        local lvl = 1
+        local count = 0
+        
+        if result then
+            lvl = result.tomtit_lvl or 1
+            count = result.tomtit_currentcount or 0
+        else
+            MySQL.insert("INSERT INTO f17_joblevel (citizenid) VALUES (?)", {cid})
+        end
+        
+        if not DATA[cid] then DATA[cid] = {} end
+        DATA[cid].level = lvl
+        DATA[cid].count = count
+    end)
+end)
+
+
+
+RegisterNetEvent('f17_tomtit:sv:checkCooldown')
+AddEventHandler('f17_tomtit:sv:checkCooldown', function(lastPos)
+    local src = source
+    local xPlayer = QBCore.Functions.GetPlayer(src)
+    if not xPlayer then return end
+    local cid = xPlayer.PlayerData.citizenid
+
+    if not DATA[cid] then
+        no:Notify(src, "⚠️ Hủy thao tác do lỗi đồng bộ!", 'error', 3000)
+        return
+    end
+
+    local currentTime = os.time()
+    if DATA[cid].timestamp and (currentTime - DATA[cid].timestamp) < 180 then
+        no:Notify(src, "⚠️ Bạn đang thao tác quá nhanh (Chưa đủ 180s)!", 'error', 3000)
+        return
+    end
+
+    local hasItem = false
+    if ox:RemoveItem(src, 'daycautom', 1) then
+        hasItem = true
+    elseif ox:RemoveItem(src, 'daycautomkhoa', 1) then
+        hasItem = true
+    end
+
+    if hasItem then
+        DATA[cid].timestamp = currentTime
+        TriggerClientEvent('f17_tomtit:cl:OpenTomTitGame', src, DATA[cid].level)
+    else
+        no:Notify(src, 'Bạn không có Dây câu tôm hoặc Dây câu khóa', 'error', 3000)
+    end
+end)
+
+local playerTreasureHistory = {}
+local function TryTriggerTreasure(src, cid, playerLevel)
+    if playerLevel < Config.Treasure.minLevelRequired then return false end
+
+    local currentTime = os.time()
+    
+    if not playerTreasureHistory[cid] then
+        playerTreasureHistory[cid] = {}
+    end
+    
+    local recentTreasures = {}
+    for _, timestamp in ipairs(playerTreasureHistory[cid]) do
+        if currentTime - timestamp < Config.Treasure.hourWindow then
+            table.insert(recentTreasures, timestamp)
         end
     end
+    playerTreasureHistory[cid] = recentTreasures
     
-    return ITEMS.COMMON -- Fallback
+    local treasureCount = #playerTreasureHistory[cid]
+    
+    if treasureCount >= Config.Treasure.maxPerHour then
+        return false
+    end
+
+    local treasureChance = math.random(1, 100)
+    if treasureChance <= Config.Treasure.treasureChance then
+        table.insert(playerTreasureHistory[cid], currentTime)
+        
+        SetTimeout(3000, function()
+            TriggerClientEvent('f17_tomtit:cl:showTreasureAfterGame', src)
+        end)
+        return true
+    end
+
+    return false
 end
 
--- ============================================
--- MINIGAME TÔM TÍCH
--- ============================================
+local function calculate_TT(P)
+    local base_xp = 4  -- XP cơ bản mỗi hành động
+    local adjustment_factor = 1 + P / 100  -- Hệ số điều chỉnh XP dựa trên giá trị P
+    local xp = base_xp * adjustment_factor  -- XP sau điều chỉnh
+    local lower_xp = math.floor(xp)  -- Giá trị XP thấp hơn
+    local higher_xp = lower_xp + 1  -- Giá trị XP cao hơn
+    local prob_higher_xp = xp - lower_xp  -- Xác suất nhận XP cao hơn
+    local rand = math.random()  -- Tạo số ngẫu nhiên
+    local final_xp  -- Biến lưu XP cuối cùng
+    if rand <= prob_higher_xp then
+        final_xp = higher_xp
+    else
+        final_xp = lower_xp
+    end
+    -- Nhân đôi XP nếu sự kiện bắt đầu
+    if Config.StartEvent then
+        final_xp = final_xp * 2
+    end
+    return final_xp, P  -- Trả về XP và P
+end
 
-local activeTomTichGames = {}
-local playerCooldowns = {} -- Anti-spam
-local playerTreasureHistory = {} -- Lưu lịch sử xuất hiện kho báu {[playerId] = {timestamp1, timestamp2, ...}}
-local playerDiggingSession = {} -- Lưu session đào cát {[src] = {cid, canOpenUI, timestamp}}
-
--- ✅ Event 1: Kiểm tra cooldown KHI BẮT ĐẦU ĐÀO
-RegisterNetEvent('tomtich:checkCooldown')
-AddEventHandler('tomtich:checkCooldown', function()
+RegisterNetEvent('f17_tomtit:sv:reward')
+AddEventHandler('f17_tomtit:sv:reward', function(data)
     local src = source
-    
     local Player = QBCore.Functions.GetPlayer(src)
     if not Player then return end
-    
     local cid = Player.PlayerData.citizenid
-    local currentTime = os.time()
+    local playerLevel = (DATA[cid] and DATA[cid].level) or 1
+    local isValidItem = false
+    local rewardItem = ITEMS.TRASH.id
     
-    -- Kiểm tra cooldown
-    local canDig = true
-    if playerCooldownTimes[cid] and currentTime - playerCooldownTimes[cid] < 180 then
-        canDig = false
-    end
-    
-    -- Lưu session đào cát
-    playerDiggingSession[src] = {
-        cid = cid,
-        canOpenUI = canDig,
-        timestamp = currentTime
-    }
-    
-    -- ✅ Nếu OK thì LƯU COOLDOWN NGAY (từ lúc bắt đầu đào)
-    if canDig then
-        playerCooldownTimes[cid] = currentTime
-    end
-end)
-
--- ✅ Event 2: Khi đào xong, kiểm tra session và quyết định mở UI hay báo lỗi
-RegisterNetEvent('tomtich:finishDigging')
-AddEventHandler('tomtich:finishDigging', function()
-    local src = source
-    
-    local session = playerDiggingSession[src]
-    if not session then
-        TriggerClientEvent('cautomtich:notification', src, nil, "⚠️ Lỗi hệ thống!")
-        TriggerClientEvent('tomtich:closeUI_immediate', src)
-        return
-    end
-    
-    -- Kiểm tra session có cho phép mở UI không
-    if not session.canOpenUI then
-        -- Đang cooldown → Báo không có tôm
-        local currentTime = os.time()
-        local remainingTime = 180 - (currentTime - (playerCooldownTimes[session.cid] or 0))
-        local minutes = math.floor(remainingTime / 60)
-        local seconds = remainingTime % 60
-        TriggerClientEvent('cautomtich:notification', src, nil, string.format("🦐 Ở đây không có tôm! Vui lòng tìm nơi khác", minutes, seconds))
-        TriggerClientEvent('tomtich:closeUI_immediate', src)
-        playerDiggingSession[src] = nil
-        return
-    end
-    
-    -- OK → Cho phép mở UI
-    local level = GetPlayerLevel(src)
-    local exp = GetPlayerExp(src)
-    
-    activeTomTichGames[src] = {
-        active = true,
-        level = level,
-        startTime = os.time(),
-        cid = session.cid
-    }
-    
-    TriggerClientEvent('tomtich:updateLevel', src, level, exp)
-    TriggerClientEvent('tomtich:allowOpenUI', src)
-    
-    -- Xóa session
-    playerDiggingSession[src] = nil
-end)
-
--- ✅ Event 3: Hủy đào cát (cancel) → Xóa cooldown
-RegisterNetEvent('tomtich:cancelDigging')
-AddEventHandler('tomtich:cancelDigging', function()
-    local src = source
-    
-    local session = playerDiggingSession[src]
-    if session and session.canOpenUI then
-        -- Nếu đang OK thì xóa cooldown vì đã cancel
-        playerCooldownTimes[session.cid] = nil
-    end
-    
-    playerDiggingSession[src] = nil
-end)
-
-RegisterNetEvent('tomtich:attempt')
-AddEventHandler('tomtich:attempt', function(success, itemCode, customMessage)
-    local src = source
-    
-    local game = activeTomTichGames[src]
-    
-    if not game or not game.active then 
-        return 
-    end
-    
-    -- 🔒 KIỂM TRA THỜI GIAN - Chống cheat (game tối thiểu theo config)
-    local currentTime = os.time()
-    local gameDuration = currentTime - game.startTime
-    
-    if gameDuration < Config.AntiSpam.minGameDuration then
-        TriggerClientEvent('cautomtich:notification', src, nil, "⚠️ Phát hiện hành vi bất thường!")
-        TriggerClientEvent('tomtich:closeUI', src) -- Đóng UI luôn nếu cheat
-        activeTomTichGames[src] = nil
-        return
-    end
-    
-    game.active = false
-    
-    -- 🔒 SERVER TỰ RANDOM TÔM - KHÔNG TIN CLIENT
-    local rewardItem = ITEMS.TRASH
-    if success then
-        -- Server tự random dựa trên level, KHÔNG dùng itemCode từ client
-        rewardItem = GetRandomShrimpByLevel(game.level)
-    end
-
-    local item = success and rewardItem or ITEMS.TRASH
-    local reason = success and "tomtich_success" or "tomtich_fail"
-    
-    -- Lưu trạng thái câu thành công và level hiện tại TRƯỚC KHI thêm EXP
-    local fishingSuccess = success
-    local currentPlayerLevel = game.level
-    
-    -- Thêm EXP nếu thành công
-    if fishingSuccess and rewardItem ~= ITEMS.TRASH then
-        local expGained = EXP_REWARDS[rewardItem] or 0
-        local leveledUp, newLevel = AddExperience(src, expGained)
-        
-        -- Cập nhật level sau khi level up (không cần thông báo ở đây vì đã có trong AddExperience)
-        if leveledUp then
-            currentPlayerLevel = newLevel
-        end
-        
-        -- Cập nhật level mới về client
-        local currentExp = GetPlayerExp(src)
-        local finalLevel = GetPlayerLevel(src)
-        TriggerClientEvent('tomtich:updateLevel', src, finalLevel, currentExp)
-    end
-    
-    -- ✅ KHÔNG CẦN LƯU COOLDOWN Ở ĐÂY NỮA - Đã lưu từ lúc bắt đầu đào cát
-    
-    -- Thêm item vào inventory
-    local addItemSuccess = ox:AddItem(src, item, 1)
-    
-    -- Gửi kết quả về client
-    TriggerClientEvent('tomtich:gameResult', src, fishingSuccess, item)
-    TriggerClientEvent('cautomtich:notification', src, item, reason)
-    
-    -- Kiểm tra level và câu thành công -> cơ hội hiển thị kho báu
-    local willShowTreasure = false
-    if fishingSuccess and currentPlayerLevel >= Config.Treasure.minLevelRequired then
-        -- Kiểm tra giới hạn 2 rương/giờ dựa trên CID (CitizenID)
-        local cid = game.cid
-        local currentTime = os.time()
-        
-        if not playerTreasureHistory[cid] then
-            playerTreasureHistory[cid] = {}
-        end
-        
-        -- Lọc bỏ các lần xuất hiện kho báu cũ hơn 1 giờ
-        local recentTreasures = {}
-        for _, timestamp in ipairs(playerTreasureHistory[cid]) do
-            if currentTime - timestamp < Config.Treasure.hourWindow then
-                table.insert(recentTreasures, timestamp)
+    if data.success then
+        rewardItem = data.item
+        local levelData = Config.Levels['Level'..playerLevel]
+        if levelData and levelData.rates and levelData.rates[rewardItem] then
+            if levelData.rates[rewardItem] > 0 then
+                isValidItem = true
             end
         end
-        playerTreasureHistory[cid] = recentTreasures
         
-        -- Kiểm tra số lượng kho báu trong 1 giờ qua
-        local treasureCount = #playerTreasureHistory[cid]
-        
-        if treasureCount >= Config.Treasure.maxPerHour then
-            -- Đã đạt giới hạn rương/giờ cho nhân vật này
+        if not isValidItem then
+            no:Notify(src, "⚠️ Bạn đang hack! Item không hợp lệ với level hiện tại.", 'error', 5000)
+            print(string.format("[CHEAT DETECTED] ID: %s Name: %s tried to spawn invalid item: %s at Level: %d", src, GetPlayerName(src), rewardItem, playerLevel))
+            return
+        end
+    else
+        rewardItem = ITEMS.TRASH.id
+    end
+
+    local item = rewardItem
+    local finalSuccess = data.success
+    local Levels = {
+        Config.Levels.Level1,
+        Config.Levels.Level2,
+        Config.Levels.Level3,
+    }
+    local money, totalmoney, xp, P = 0, 0, 0, 0
+
+    for i = #Levels, 1, -1 do
+        if playerLevel >= i then
+            money = Levels[i].Payout
+            break
+        end
+    end
+
+    local check = GlobalState.BDVL.vieclam.tomtit
+    local moneyText, xpText
+    if check then
+        xp, P = calculate_TT(check.xp)
+        if P > 0 then
+            xpText = "+ ~g~$"..xp.." XP~s~ ~b~(+"..P.."% BDVL)~s~"
+        elseif P < 0 then
+            xpText = "+ ~g~$"..xp.." XP~s~ ~r~("..P.."% BDVL)~s~"
         else
-            local treasureChance = math.random(1, 100)
-            if treasureChance <= Config.Treasure.treasureChance then
-                willShowTreasure = true
-                
-                -- Lưu timestamp xuất hiện kho báu cho CID này
-                table.insert(playerTreasureHistory[cid], currentTime)
-                
-                -- Delay 3 giây để người chơi thấy kết quả câu tôm trước
-                Citizen.SetTimeout(3000, function()
-                    TriggerClientEvent('tomtich:showTreasureAfterGame', src)
-                end)
-            end
+            xpText = "+ ~g~"..xp.." XP nhân vật~s~"
         end
     end
     
-    -- Nếu không có kho báu, đóng UI sau 3 giây
+    MySQL.update('UPDATE f17_joblevel SET tomtit_currentcount = tomtit_currentcount + 1, tomtit_totalcount = tomtit_totalcount + 1 WHERE citizenid = ?', {cid})
+
+    local notifyText = "~y~[Tôm Tít]~w~ Bạn nhận được:"
+    if moneyText then notifyText = notifyText.."\n"..moneyText end
+    if xpText then notifyText = notifyText.."\n"..xpText end
+    notifyText = notifyText.."\n+ ~g~1 điểm tích lũy Tôm Tít~s~"
+
+    TriggerClientEvent('f17-level:client:AddPlayerXP', src, xp)
+    local addItemSuccess = ox:AddItem(src, item, 1)
+    if addItemSuccess then
+        notifyText = notifyText.."\n+ ~g~1 "..ox:Items()[item].label.."~s~"
+    end
+
+    TriggerClientEvent("QBCore:Notify", src, notifyText, "success", 10000)
+
+    local willShowTreasure = false
+    if finalSuccess then
+        willShowTreasure = TryTriggerTreasure(src, cid, playerLevel)
+    end
+
     if not willShowTreasure then
-        Citizen.SetTimeout(3000, function()
-            TriggerClientEvent('tomtich:closeUI_immediate', src) -- Trigger đóng ngay lập tức sau 3s
-        end)
+        TriggerClientEvent('f17_tomtit:cl:closeUI', src)
     end
-    
-    -- Thông báo nếu túi đầy
-    if not addItemSuccess then
-        TriggerClientEvent('cautomtich:notification', src, nil, "⚠️ Không thể nhận vật phẩm!")
-    end
-    
-    activeTomTichGames[src] = nil
+end)
+
+local ActiveTreasures = {}
+
+RegisterNetEvent('f17_tomtit:sv:RegisterTreasure')
+AddEventHandler('f17_tomtit:sv:RegisterTreasure', function(netId)
+    local src = source
+    ActiveTreasures[src] = netId
 end)
 
 AddEventHandler('playerDropped', function()
     local src = source
-    if activeTomTichGames[src] then
-        activeTomTichGames[src] = nil
+    if ActiveTreasures[src] then
+        local entity = NetworkGetEntityFromNetworkId(ActiveTreasures[src])
+        if DoesEntityExist(entity) then
+            DeleteEntity(entity)
+        end
+        ActiveTreasures[src] = nil
     end
-end)
-
--- ============================================
--- MINIGAME KHO BÁU (TREASURE HUNT)
--- ============================================
-
-local activeTreasureGames = {}
-
-RegisterNetEvent('treasure:startGame')
-AddEventHandler('treasure:startGame', function()
-    local src = source
-    local Player = QBCore.Functions.GetPlayer(src)
-    if not Player then return end
-    
-    activeTreasureGames[src] = {
-        active = true,
-        startTime = os.time(),
-        cid = Player.PlayerData.citizenid
-    }
-    
-    -- Send initial state to client
-    TriggerClientEvent('treasure:gameData', src, {
-        attempts = Config.Treasure.initialAttempts
-    })
 end)
 
 RegisterNetEvent('treasure:finishGame')
-AddEventHandler('treasure:finishGame', function(success)
+AddEventHandler('treasure:finishGame', function(success, clientItem)
     local src = source
-    local game = activeTreasureGames[src]
-    
-    if not game or not game.active then return end
-    
-    -- Basic validation: check duration
-    local duration = os.time() - game.startTime
-    if duration < 5 then -- Too fast for a 5x5 grid search
-        TriggerClientEvent('cautomtich:notification', src, nil, "⚠️ Phát hiện hành vi bất thường!")
-        activeTreasureGames[src] = nil
-        return
-    end
-    
-    game.active = false
+    local Player = QBCore.Functions.GetPlayer(src)
+    if not Player then return end
+    local cid = Player.PlayerData.citizenid
+
+    -- if not playerTreasureHistory[cid] or #playerTreasureHistory[cid] == 0 then
+    --     TriggerClientEvent("QBCore:Notify", src, "Bạn chưa tìm thấy kho báu nào gần đây!", "error", 5000)
+    --     return
+    -- end
     
     if success then
-        -- Grant reward
-        ox:AddItem(src, ITEMS.TREASURE, Config.Treasure.rewardAmount)           
-        TriggerClientEvent('cautomtich:notification', src, ITEMS.TREASURE, "🎉 Chúc mừng! Bạn đã nhận được kho báu!")
+        local validItems = {
+            ['ngoctraitrang'] = true,
+            ['ngoctraiden'] = true
+        }
         
-        -- Optional: Add EXP if defined
-        if Config.ExpRewards[ITEMS.TREASURE] then
-            AddExperience(src, Config.ExpRewards[ITEMS.TREASURE])
+        local rewardItem = clientItem
+        
+        if not validItems[rewardItem] then
+            print(string.format("[Treasure] Invalid item from client: %s (ID: %s)", tostring(rewardItem), src))
+            rewardItem = "ngoctraitrang"
         end
-    end
-    
-    activeTreasureGames[src] = nil
-end)
-
-RegisterNetEvent('treasure:close')
-AddEventHandler('treasure:close', function()
-    local src = source
-    if activeTreasureGames[src] then
-        activeTreasureGames[src] = nil
+        
+        local addItemSuccess = ox:AddItem(src, rewardItem, 1)
+        
+        if not addItemSuccess then
+            no:Notify(src, 'Túi đồ đã đầy!', 'error', 5000)
+        end
     end
 end)

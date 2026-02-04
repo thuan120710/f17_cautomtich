@@ -1,31 +1,23 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="vi">
 
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Câu Tôm Tích</title>
-    <link rel="stylesheet" href="style.css">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>Câu TÔM TÍT</title>
 </head>
-
 <body>
-    <div id="app">
-        <!-- TomTich UI - Game câu tôm tích (Vertical) -->
-        <div v-if="tomtichVisible" id="tomtich-container">
-            <!-- Main Game Wrapper - Hidden during tunnel phase -->
-            <div v-if="gamePhase !== 'TUNNEL_NAV'" class="tomtich-wrapper">
-                <!-- Header Bar for Phase 2 -->
+    <div id="app" v-cloak>
+        <div v-if="tomtitVisible" id="tomtit-container">
+            <div v-if="gamePhase !== 'TUNNEL_NAV'" class="tomtit-wrapper">
                 <div v-if="gamePhase !== 'IDLE'" class="game-header-bar">
-                    <div class="game-title-header">🦞 CÂU TÔM TÍCH - GIAI ĐOẠN 2</div>
-                    <button @click="handleTomTichClose" class="game-close-btn-header">✖</button>
+                    <div class="game-title-header">🦞 CÂU TÔM TÍT - GIAI ĐOẠN 2</div>
+                    <button @click="handleTomTitClose" class="game-close-btn-header">✖</button>
                 </div>
-                
-                <!-- Close button for IDLE phase only -->
-                <button v-if="gamePhase === 'IDLE'" @click="handleTomTichClose" class="tomtich-close-btn">✖</button>
 
-                <!-- Phase 1: Start Prompt -->
+                <button v-if="gamePhase === 'IDLE'" @click="handleTomTitClose" class="tomtit-close-btn">✖</button>
                 <div v-if="gamePhase === 'IDLE'" class="start-prompt">
-                    <div class="game-title">🦞 CÂU TÔM TÍCH</div>
+                    <div class="game-title">🦞 CÂU TÔM TÍT</div>
                     <div class="player-level-badge">LEVEL {{ playerLevel }}</div>
                     <div v-if="!tunnelCompleted" class="phase-badge">GIAI ĐOẠN 1</div>
                     <div v-else class="phase-badge-2">GIAI ĐOẠN 2</div>
@@ -48,10 +40,11 @@
                         <div class="completed-text-main">Đã qua hang thành công!</div>
                         <div class="next-step-text">Tiếp theo: Thả dây câu xuống đáy</div>
                     </div>
-                    <div class="start-button">{{ tunnelCompleted ? 'GIỮ SPACE ĐỂ BẮT ĐẦU' : 'GIỮ SPACE ĐỂ BẮT ĐẦU' }}</div>
+                    <div class="start-button">{{ tunnelCompleted ? 'GIỮ SPACE ĐỂ BẮT ĐẦU' : 'GIỮ SPACE ĐỂ BẮT ĐẦU' }}
+                    </div>
                 </div>
 
-                <!-- Phase 2: Dropping Line -->
+                
                 <div v-if="gamePhase === 'DROPPING'" class="dropping-phase">
                     <div class="phase-indicator">
                         <span class="phase-icon">⬇️</span>
@@ -91,26 +84,25 @@
                     <div class="urgency-bar"></div>
                 </div>
 
-                <div class="tomtich-scene-vertical" :class="{ 'blur-bg': gamePhase === 'IDLE' }">
-                    <!-- Result Popup Overlay (Enhanced) -->
-                    <div v-if="gamePhase === 'RESULT'" class="tomtich-result-enhanced"
-                        :class="{ 'result-success': tomtichResultSuccess, 'result-fail': !tomtichResultSuccess }">
+                <div class="tomtit-scene-vertical" :class="{ 'blur-bg': gamePhase === 'IDLE' }">
+                    
+                    <div v-if="gamePhase === 'RESULT'" class="tomtit-result-enhanced" :class="{ 'result-success': tomtitResultSuccess, 'result-fail': !tomtitResultSuccess }">
                         <div class="result-icon-large">
-                            {{ tomtichResultSuccess ? '🎉' : '😢' }}
+                            {{ tomtitResultSuccess ? '🎉' : '😢' }}
                         </div>
                         <div class="result-title">
-                            {{ tomtichResultSuccess ? 'THÀNH CÔNG!' : 'THẤT BẠI!' }}
+                            {{ tomtitResultSuccess ? 'THÀNH CÔNG!' : 'THẤT BẠI!' }}
                         </div>
                         <div class="result-message">
                             {{ resultMessage }}
                         </div>
-                        <div class="result-reward" v-if="tomtichResultSuccess">
-                            <img :src="currentShrimpImage" class="reward-icon-img" alt="Tôm tích">
+                        <div class="result-reward" v-if="tomtitResultSuccess">
+                            <img :src="currentShrimpImage" class="reward-icon-img" alt="TÔM TÍT">
                             <span class="reward-text">Đã nhận phần thưởng!</span>
                         </div>
                     </div>
 
-                    <!-- Cát bên trái -->
+                    
                     <div class="sand-left-vertical">
                         <div class="sand-decorations">
                             <span class="deco">🐚</span>
@@ -118,28 +110,26 @@
                         </div>
                     </div>
 
-                    <!-- Hang tôm tích ở giữa (dọc) -->
+                    
                     <div class="cave-vertical" :class="{ 'shake': shrimpPulling }">
-                        <!-- Dây câu - chiều dài thay đổi theo lực căng -->
-                        <div v-if="['FISHING', 'RESULT', 'DROPPING', 'WAITING', 'BITING'].includes(gamePhase)"
-                            class="fishing-line-vertical" :style="{ height: fishingLineHeight + '%' }">
+                        
+                        <div v-if="['FISHING', 'RESULT', 'DROPPING', 'WAITING', 'BITING'].includes(gamePhase)" class="fishing-line-vertical" :style="{ height: fishingLineHeight + '%' }">
                             <div class="hook-vertical" :class="{ 'shake': gamePhase === 'BITING' }">🐚</div>
                         </div>
 
-                        <!-- Tôm tích - vị trí thay đổi theo lực căng -->
-                        <div v-if="gamePhase === 'FISHING'" class="shrimp-container"
-                            :style="{ top: shrimpPosition + '%' }">
-                            <img :src="currentShrimpImage" class="shrimp-icon-img" :class="{ 'pulling': shrimpPulling }" alt="Tôm tích">
+                        
+                        <div v-if="gamePhase === 'FISHING'" class="shrimp-container" :style="{ top: shrimpPosition + '%' }">
+                            <img :src="currentShrimpImage" class="shrimp-icon-img" :class="{ 'pulling': shrimpPulling }" alt="TÔM TÍT">
                         </div>
 
-                        <!-- Hiệu ứng tôm giật -->
+                        
                         <div v-if="shrimpPulling" class="pull-warning">⚠️ TÔM GIẬT MẠNH!</div>
 
-                        <!-- Đáy hang -->
+                        
                         <div class="cave-bottom"></div>
                     </div>
 
-                    <!-- Cát bên phải -->
+                    
                     <div class="sand-right-vertical">
                         <div class="sand-decorations">
                             <span class="deco">🌊</span>
@@ -147,24 +137,24 @@
                         </div>
                     </div>
 
-                    <!-- Thanh lực căng bên ngoài cát phải -->
+                    
                     <div class="timing-container-outside">
                         <div v-if="gamePhase === 'FISHING'" class="tension-bar-container">
                             <div class="tension-label">LỰC CĂNG</div>
                             <div class="tension-bar">
-                                <!-- Vùng nguy hiểm trên (lực thấp - tôm thoát) -->
+                                
                                 <div class="tension-zone danger-low-top">
                                     <span class="zone-label">TÔM THOÁT</span>
                                 </div>
-                                <!-- Vùng an toàn (xanh/vàng) -->
+                                
                                 <div class="tension-zone safe-zone">
                                     <span class="zone-label">AN TOÀN</span>
                                 </div>
-                                <!-- Vùng nguy hiểm dưới (lực cao - đứt dây) -->
+                                
                                 <div class="tension-zone danger-high-bottom">
                                     <span class="zone-label">ĐỨT DÂY</span>
                                 </div>
-                                <!-- Thanh lực hiện tại -->
+                                
                                 <div class="tension-indicator" :style="{ top: tensionLevel + '%' }">
                                     <span class="indicator-arrow">◀</span>
                                     <span class="indicator-value">{{ Math.round(100 - tensionLevel) }}%</span>
@@ -175,8 +165,8 @@
                     </div>
                 </div>
 
-                <!-- Nút điều khiển -->
-                <div class="tomtich-controls">
+                
+                <div class="tomtit-controls">
                     <div v-if="gamePhase === 'FISHING'" class="control-instructions">
                         <div class="fishing-status-bar">
                             <div class="status-item">
@@ -206,12 +196,12 @@
                 </div>
 
             </div>
-            <!-- End of tomtich-wrapper -->
+            
 
-            <!-- Fishing Instructions Panel - Separate (Outside game container) -->
+            
             <div v-if="gamePhase === 'FISHING'" class="fishing-instruction-panel-outside">
                 <div class="instruction-header">
-                    <span class="header-icon">🎣</span>
+                    <span class="header-icon">🦞</span>
                     <h2>HƯỚNG DẪN CÂU TÔM</h2>
                 </div>
                 <div class="instruction-content">
@@ -236,37 +226,36 @@
                 </div>
             </div>
 
-            <!-- Phase 1.5: Tunnel Navigation (Full Screen Overlay) -->
+            
             <div v-if="gamePhase === 'TUNNEL_NAV'" id="tunnel-game-container">
-                <!-- Header Bar with Title and Close Button -->
+                
                 <div class="tunnel-header-bar">
                     <div class="tunnel-title">GIAI ĐOẠN 1: ĐI QUA HANG</div>
-                    <button @click="handleTomTichClose" class="tunnel-close-btn-header">✖</button>
+                    <button @click="handleTomTitClose" class="tunnel-close-btn-header">✖</button>
                 </div>
-                
+
                 <canvas id="tunnelCanvas" ref="tunnelCanvas"></canvas>
 
-                <!-- Bottom Info Panel - 3 rows -->
+                
                 <div class="tunnel-bottom-panel">
-                    <!-- Row 1: Status Message (moved to top) -->
+                    
                     <div class="message-row">
-                        <!-- Collision Warning -->
+                        
                         <div v-if="tunnelCollisionWarning" class="tunnel-status-message warning">
                             <div class="status-icon">⚠️</div>
                             <div class="status-text">GẦN TƯỜNG!</div>
                         </div>
 
-                        <!-- Main Message (Auto-hide after 1s) -->
-                        <div v-else-if="tunnelMessage" class="tunnel-status-message" 
-                             :class="{ 'success': tunnelMessage.includes('✅'), 'error': !tunnelMessage.includes('✅') }">
+                        
+                        <div v-else-if="tunnelMessage" class="tunnel-status-message" :class="{ 'success': tunnelMessage.includes('✅'), 'error': !tunnelMessage.includes('✅') }">
                             <div class="status-icon">{{ tunnelMessage.includes('✅') ? '✅' : '⚠️' }}</div>
                             <div class="status-text">{{ tunnelMessage.replace('✅', '').trim() }}</div>
                         </div>
                     </div>
 
-                    <!-- Row 2: Speed & Combo -->
+                    
                     <div class="info-row">
-                        <!-- Speed Indicator -->
+                        
                         <div class="tunnel-speed-indicator">
                             <div class="speed-icon">⚡</div>
                             <div class="speed-content">
@@ -278,7 +267,7 @@
                             <div class="speed-value">{{ tunnelSpeed }}%</div>
                         </div>
 
-                        <!-- Combo Counter -->
+                        
                         <div v-if="tunnelCombo > 0" class="tunnel-combo-indicator">
                             <div class="combo-icon">🔥</div>
                             <div class="combo-content">
@@ -288,7 +277,7 @@
                         </div>
                     </div>
 
-                    <!-- Row 3: Horizontal Progress Bar -->
+                    
                     <div class="tunnel-progress-horizontal">
                         <div class="progress-label-left">ĐỘ SÂU</div>
                         <div class="progress-bar-horizontal">
@@ -299,7 +288,7 @@
                 </div>
             </div>
 
-            <!-- Instructions Panel - Separate (Outside tunnel container) -->
+            
             <div v-if="gamePhase === 'TUNNEL_NAV' && showTunnelInstruction" class="tunnel-instruction-panel-outside">
                 <div class="instruction-header">
                     <span class="header-icon">🎯</span>
@@ -309,7 +298,7 @@
                     <div class="control-item">
                         <div class="control-icon">🖱️</div>
                         <div class="control-desc">
-                            <strong>Giữ chuột trái</strong>
+                            <strong>Giữ SPACE</strong>
                             <span>Thả móc câu xuống</span>
                         </div>
                     </div>
@@ -339,7 +328,7 @@
             </div>
         </div>
 
-        <!-- Treasure Hunt UI - Mini Game Đào Kho Báu -->
+        
         <div v-if="treasureVisible" id="treasure-container">
             <div class="treasure-wrapper">
                 <div class="treasure-header">
@@ -361,23 +350,17 @@
                 </div>
 
                 <div class="treasure-grid">
-                    <div 
-                        v-for="(cell, index) in treasureCells" 
-                        :key="index"
-                        class="treasure-cell"
-                        :class="{ 
+                    <div v-for="(cell, index) in treasureCells" :key="index" class="treasure-cell" :class="{ 
                             'opened': cell.opened, 
                             'treasure': cell.isTreasure,
                             'trash': cell.opened && !cell.isTreasure,
                             'revealed': treasureGameEnded
-                        }"
-                        @click="openTreasureCell(index)"
-                    >
+                        }" @click="openTreasureCell(index)">
                         <div class="cell-front">
                             <img src="images/ruong.png" alt="Rương" class="ruong-img">
                         </div>
                         <div class="cell-back">
-                            <img v-if="cell.isTreasure" src="images/seashell-clipart-original.png" class="treasure-icon-img" alt="Kho báu">
+                            <img v-if="cell.isTreasure" :src="treasureRewardImage" class="treasure-icon-img" alt="Kho báu">
                             <span v-else class="trash-icon">🗑️</span>
                         </div>
                     </div>
@@ -390,7 +373,10 @@
 
                 <div v-if="treasureGameEnded && treasureResultMessage" class="treasure-result">
                     <div class="result-overlay" :class="{ 'win': treasureSuccess, 'lose': !treasureSuccess }">
-                        <div class="result-icon">{{ treasureSuccess ? '🎉' : '😢' }}</div>
+                        <div class="result-icon">
+                            <img v-if="treasureSuccess" :src="treasureRewardImage" style="width: 100px; height: 100px; object-fit: contain; filter: drop-shadow(0 0 15px rgba(255, 215, 0, 0.5));" alt="Kho báu">
+                            <span v-else>😢</span>
+                        </div>
                         <div class="result-title">{{ treasureSuccess ? 'THÀNH CÔNG!' : 'THẤT BẠI!' }}</div>
                         <div class="result-message">{{ treasureResultMessage }}</div>
                     </div>
@@ -399,9 +385,8 @@
         </div>
     </div>
 
-    <!-- Force reload by adding version query -->
+    
     <script src="https://cdn.jsdelivr.net/npm/vue@3.3.4/dist/vue.global.prod.js"></script>
-    <script src="script.js"></script>
 </body>
 
 </html>

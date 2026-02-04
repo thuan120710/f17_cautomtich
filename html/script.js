@@ -1,40 +1,25 @@
-// ============================================
-// VUE.JS APP - Câu Tôm Tích
-// ============================================
-
 const { createApp, ref, onMounted, onBeforeUnmount } = Vue;
-
-// ============================================
-// CONSTANTS & SOUNDS
-// ============================================
-// Sound objects will be initialized in updateConfig
 let SOUNDS = {
     win: null, lose: null, ocean: null, reelIn: null, shrimpPull: null, tension: null
 };
 
-// ============================================
-// ROOT APP
-// ============================================
 const app = createApp({
     setup() {
-        // App State
-        const tomtichVisible = ref(false);
-        const gamePhase = ref('IDLE'); // IDLE, TUNNEL_NAV, DROPPING, FISHING, RESULT
-        const tomtichStatus = ref('Sẵn sàng'); // Legacy UI status if needed
+        const tomtitVisible = ref(false);
+        const gamePhase = ref('IDLE');
+        const tomtitStatus = ref('Sẵn sàng');
         const resultMessage = ref('');
-        const tomtichResultSuccess = ref(false);
+        const tomtitResultSuccess = ref(false);
 
-        // TUNNEL NAV STATE
         const showTunnelInstruction = ref(true);
         const tunnelCanvas = ref(null);
-        const tunnelCompleted = ref(false); // Validates tunnel pass
+        const tunnelCompleted = ref(false);
         const tunnelMessage = ref('');
         const tunnelProgress = ref(0);
-        const tunnelSpeed = ref(0); // For UI display
-        const tunnelCollisionWarning = ref(false); // Warning when near wall
-        const tunnelCombo = ref(0); // Combo for staying in center
+        const tunnelSpeed = ref(0);
+        const tunnelCollisionWarning = ref(false);
+        const tunnelCombo = ref(0);
 
-        // TREASURE HUNT STATE
         const treasureVisible = ref(false);
         const treasureCells = ref([]);
         const treasureAttempts = ref(5);
@@ -43,41 +28,30 @@ const app = createApp({
         const treasureGameEnded = ref(false);
         const treasureSuccess = ref(false);
         const treasureResultMessage = ref('');
-        const treasurePositions = ref([]); // Local treasure positions
-        const treasureOpenedIndices = ref([]); // Track opened cells
+        const treasurePositions = ref([]);
+        const treasureOpenedIndices = ref([]);
 
-
-        // Game Configuration (Will be synced from Lua)
         const uiConfig = ref(null);
-
-        // Dynamic Shrimp Types (will be generated from Config)
         const shrimpTypesByLevel = ref({});
-
-        // Player level (will be received from server)
         const playerLevel = ref(1);
 
-        // Game State
         const currentShrimp = ref(null);
         const currentShrimpImage = ref('');
 
-        // Tension system
         const tensionLevel = ref(50);
         const catchProgress = ref(0);
         const timeRemaining = ref(30);
         const isHoldingSpace = ref(false);
 
-        // Visual effects
         const fishingLineHeight = ref(100);
         const shrimpPosition = ref(80);
         const shrimpPulling = ref(false);
         const shrimpResistance = ref(0.5);
 
-        // Animation Frames & Time
-        let tomtichAnimationFrame = null;
+        let tomtitAnimationFrame = null;
         let lastUpdateTime = 0;
         let gameStartTime = 0;
 
-        // Constants (Updated via updateConfig)
         let TENSION_SAFE_MIN = 30;
         let TENSION_SAFE_MAX = 70;
         let GAME_TIME_LIMIT = 30000;
@@ -86,14 +60,14 @@ const app = createApp({
         let PULL_INTERVAL_MAX = 4000;
 
         let TUNNEL_TOTAL_DEPTH = 5000;
-        let TUNNEL_PATH_WIDTH = 130;
+        let TUNNEL_PATH_WIDTH = 180;  
         let TUNNEL_WARNING_DIST = 20;
         let TUNNEL_MAX_SPEED = 3.0;
         let TUNNEL_ACCEL = 0.1;
         let TUNNEL_FRICTION = 0.2;
         let TUNNEL_RETRACT_SPEED = 8;
         let TUNNEL_LERP_SPEED = 0.25;
-        let TUNNEL_SWAY = 80;
+        let TUNNEL_SWAY = 40;  
 
         let DROP_SPEED = 40;
         let DROP_RETRACT_SPEED = 60;
@@ -111,7 +85,6 @@ const app = createApp({
         let WARN_THRESHOLD_HI = 85;
         let WARN_THRESHOLD_LO = 15;
 
-        // Sound Helper
         const stopAllSounds = () => {
             if (SOUNDS.ocean) { SOUNDS.ocean.pause(); SOUNDS.ocean.currentTime = 0; }
             if (SOUNDS.reelIn) { SOUNDS.reelIn.pause(); SOUNDS.reelIn.currentTime = 0; }
@@ -119,20 +92,16 @@ const app = createApp({
             if (SOUNDS.shrimpPull) { SOUNDS.shrimpPull.pause(); SOUNDS.shrimpPull.currentTime = 0; }
         };
 
-        // ============================================
-        // LOGIC
-        // ============================================
-
         const closeGameUI = () => {
-            tomtichVisible.value = false;
+            tomtitVisible.value = false;
             gamePhase.value = 'IDLE';
             resetGameState();
             stopAllSounds();
         };
 
-        const handleTomTichClose = () => {
+        const handleTomTitClose = () => {
             closeGameUI();
-            fetch(`https://${getParentResourceName()}/closeTomTich`, {
+            fetch(`https://f17_cautomtit/closeTomTit`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({})
@@ -143,66 +112,58 @@ const app = createApp({
             tensionLevel.value = 50;
             catchProgress.value = 0;
             timeRemaining.value = 30;
-            fishingLineHeight.value = 0; // Start at 0 for drop phase
+            fishingLineHeight.value = 0;
             shrimpPosition.value = 50;
             shrimpPulling.value = false;
             isHoldingSpace.value = false;
             resultMessage.value = '';
 
-            if (tomtichAnimationFrame) {
-                cancelAnimationFrame(tomtichAnimationFrame);
-                tomtichAnimationFrame = null;
+            if (tomtitAnimationFrame) {
+                cancelAnimationFrame(tomtitAnimationFrame);
+                tomtitAnimationFrame = null;
             }
 
-            // Cleanup Tunnel
             cleanupTunnelGame();
             tunnelCompleted.value = false;
         };
 
-        // ============================================
-        // PHASE 0: TUNNEL NAVIGATION (New)
-        // ============================================
         let tunnelCtx = null;
         let tunnelState = {
             active: false,
             path: [],
             hookX: 0,
             hookY: 0,
-            depth: 0, // distance travelled
-            linePoints: [], // trail
+            depth: 0,
+            linePoints: [],
             speed: 0,
-            maxSpeed: 3.5, // Tăng tốc độ rơi
+            maxSpeed: 3.5,
             cameraY: 0,
             mouseX: 0,
             isMouseDown: false
         };
 
-        // Configuration
         const TUNNEL_WIDTH = 450;
-        const PATH_WIDTH = 130; // Hẹp hơn để khó hơn (giảm từ 140 xuống 100)
+        const PATH_WIDTH = 180;  // Tăng từ 130 -> 180 để khớp với TUNNEL_PATH_WIDTH
         const TOTAL_DEPTH = 5000;
-        const WARNING_DISTANCE = 20; // Distance from wall to show warning
+        const WARNING_DISTANCE = 20;
 
         const initTunnelGame = () => {
-            // Wait for DOM
             setTimeout(() => {
                 const canvas = tunnelCanvas.value;
                 if (!canvas) return;
 
-                // Adjust to container size
                 canvas.width = canvas.parentElement.clientWidth;
                 canvas.height = canvas.parentElement.clientHeight;
 
                 tunnelCtx = canvas.getContext('2d');
                 const width = canvas.width;
 
-                // Reset State
                 tunnelState = {
                     active: true,
                     path: generateTunnelPath(TUNNEL_TOTAL_DEPTH + canvas.height, width),
                     hookX: width / 2,
                     hookY: 100,
-                    hookVelocityX: 0, // Vận tốc ngang của móc
+                    hookVelocityX: 0,
                     depth: 0,
                     linePoints: [],
                     speed: 0,
@@ -211,7 +172,7 @@ const app = createApp({
                     friction: TUNNEL_FRICTION,
                     cameraY: 0,
                     mouseX: width / 2,
-                    targetX: width / 2, // Target position với smoothing
+                    targetX: width / 2,
                     isMouseDown: false,
                     particles: [],
                     shake: 0,
@@ -223,24 +184,17 @@ const app = createApp({
 
                 showTunnelInstruction.value = true;
 
-                // Không tự động ẩn - hiển thị cố định
-                // setTimeout(() => {
-                //     showTunnelInstruction.value = false;
-                // }, 5000);
-
-                // Add Listeners
                 canvas.addEventListener('mousemove', onTunnelMouseMove);
                 canvas.addEventListener('mousedown', onTunnelMouseDown);
                 canvas.addEventListener('mouseup', onTunnelMouseUp);
 
-                // Start Loop
                 tunnelLoop();
             }, 100);
         };
 
         const cleanupTunnelGame = () => {
             tunnelState.active = false;
-            const canvas = document.getElementById('tunnelCanvas'); // Direct access fallback
+            const canvas = document.getElementById('tunnelCanvas');
             if (canvas) {
                 canvas.removeEventListener('mousemove', onTunnelMouseMove);
                 canvas.removeEventListener('mousedown', onTunnelMouseDown);
@@ -253,7 +207,7 @@ const app = createApp({
             let currentX = screenWidth / 2;
 
             for (let y = 0; y < length; y += 20) {
-                // Random sway với độ cong CỰC LỚN - đi thẳng chắc chắn đụng
+                // Random sway - đã giảm từ 80 xuống 40
                 const change = (Math.random() - 0.5) * TUNNEL_SWAY;
                 currentX += change;
 
@@ -264,7 +218,8 @@ const app = createApp({
                 points.push({
                     y,
                     x: currentX,
-                    width: TUNNEL_PATH_WIDTH + Math.sin(y * 0.01) * 15 // Varying width ít hơn vì đã hẹp
+                    // Giảm biến động độ rộng từ ±15 xuống ±8 để ổn định hơn
+                    width: TUNNEL_PATH_WIDTH + Math.sin(y * 0.01) * 8
                 });
             }
             return points;
@@ -341,7 +296,14 @@ const app = createApp({
 
             const tunnelCenterX = currentPoint.x;
             const currentPathWidth = currentPoint.width || TUNNEL_PATH_WIDTH;
-            const safeHalfWidth = currentPathWidth / 2;
+            
+            // Tính hitbox chính xác:
+            // - Tường visual có thêm 30px shadow
+            // - Móc câu có bán kính ~20px (28px font + glow)
+            // - Tổng buffer: 30 - 20 = 10px (để móc chạm tường mới collision)
+            const hookRadius = 20;
+            const wallShadow = 30;
+            const safeHalfWidth = (currentPathWidth / 2) + (wallShadow - hookRadius);
             const distanceFromWall = Math.abs(tunnelState.hookX - tunnelCenterX);
 
             // Warning zone (near walls)
@@ -686,8 +648,8 @@ const app = createApp({
                     // User requested: "chỉ có cơ chế giữ chuột mới reset lại thôi" -> Don't reset tunnel here.
                     // tunnelCompleted.value = false;
 
-                    if (tomtichAnimationFrame) cancelAnimationFrame(tomtichAnimationFrame);
-                    tomtichAnimationFrame = null;
+                    if (tomtitAnimationFrame) cancelAnimationFrame(tomtitAnimationFrame);
+                    tomtitAnimationFrame = null;
                     return;
                 }
             }
@@ -700,7 +662,7 @@ const app = createApp({
                 return;
             }
 
-            tomtichAnimationFrame = requestAnimationFrame(updateDropLoop);
+            tomtitAnimationFrame = requestAnimationFrame(updateDropLoop);
         };
 
         // PHASE: WAITING (Hold Space 5-8s)
@@ -743,7 +705,7 @@ const app = createApp({
                 return;
             }
 
-            tomtichAnimationFrame = requestAnimationFrame(updateWaitLoop);
+            tomtitAnimationFrame = requestAnimationFrame(updateWaitLoop);
         };
 
         // PHASE: BITING (Release Space within 2s)
@@ -801,11 +763,11 @@ const app = createApp({
                     SOUNDS.tension.currentTime = 0;
                 }
 
-                endTomTichGame(false, 'Tôm đã thoát! (Phản xạ chậm)');
+                endTomTitGame(false, 'Tôm đã thoát! (Phản xạ chậm)');
                 return;
             }
 
-            tomtichAnimationFrame = requestAnimationFrame(updateBiteLoop);
+            tomtitAnimationFrame = requestAnimationFrame(updateBiteLoop);
         };
 
         // Step 2: Dropping finished -> Hook set -> Select Shrimp -> Start Minigame
@@ -826,7 +788,7 @@ const app = createApp({
 
             if (shrimpTypes.length === 0) {
                 console.error("No shrimp types defined for level", currentLevel);
-                endTomTichGame(false, 'Lỗi cấu hình (Không có tôm)');
+                endTomTitGame(false, 'Lỗi cấu hình (Không có tôm)');
                 return;
             }
 
@@ -934,25 +896,25 @@ const app = createApp({
 
             // End Conditions
             if (tensionLevel.value <= FAIL_TENSION_MIN) {
-                endTomTichGame(false, 'Tôm tích đã chui vào hang!');
+                endTomTitGame(false, 'Tôm tít đã chui vào hang!');
             } else if (tensionLevel.value >= FAIL_TENSION_MAX) {
-                endTomTichGame(false, 'Dây câu đã đứt!');
+                endTomTitGame(false, 'Dây câu đã đứt!');
             } else if (catchProgress.value >= 100) {
-                endTomTichGame(true, `Câu được ${currentShrimp.value.name}!`);
+                endTomTitGame(true, `Câu được ${currentShrimp.value.name}!`);
             } else if (timeRemaining.value <= 0) {
-                endTomTichGame(false, 'Tôm tích đã trốn vào hang!');
+                endTomTitGame(false, 'Tôm tít đã trốn vào hang!');
             } else {
-                tomtichAnimationFrame = requestAnimationFrame(updateTensionLoop);
+                tomtitAnimationFrame = requestAnimationFrame(updateTensionLoop);
             }
         };
 
-        const endTomTichGame = (success, message) => {
+        const endTomTitGame = (success, message) => {
             gamePhase.value = 'RESULT';
-            tomtichResultSuccess.value = success;
+            tomtitResultSuccess.value = success;
             resultMessage.value = message;
 
-            if (tomtichAnimationFrame) {
-                cancelAnimationFrame(tomtichAnimationFrame);
+            if (tomtitAnimationFrame) {
+                cancelAnimationFrame(tomtitAnimationFrame);
             }
 
             stopAllSounds();
@@ -961,7 +923,7 @@ const app = createApp({
             else SOUNDS.lose.play().catch(() => { });
 
             // Send full object or just ID
-            fetch(`https://${getParentResourceName()}/tomtichAttempt`, {
+            fetch(`https://f17_cautomtit/tomtitReward`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -973,24 +935,22 @@ const app = createApp({
 
             // Failsafe: Nếu server không phản hồi đóng UI sau 10 giây, tự đóng
             setTimeout(() => {
-                if (tomtichVisible.value && gamePhase.value === 'RESULT') {
-                    handleTomTichClose();
+                if (tomtitVisible.value && gamePhase.value === 'RESULT') {
+                    handleTomTitClose();
                 }
             }, 5000);
         };
 
-        const getParentResourceName = () => 'f17_cautomtich';
+        const getParentResourceName = () => 'f17_cautomtit';
 
         const updateConfig = (config) => {
             if (!config || !config.NUI) return;
             uiConfig.value = config.NUI;
             const nui = config.NUI;
 
-            // Update Sounds
             if (nui.Sounds) {
                 for (const [key, data] of Object.entries(nui.Sounds)) {
                     if (SOUNDS[key]) {
-                        // If already exists, just update volume
                         SOUNDS[key].volume = data.volume || 0.5;
                     } else {
                         SOUNDS[key] = new Audio(data.url);
@@ -1001,7 +961,6 @@ const app = createApp({
                 if (SOUNDS.reelIn) SOUNDS.reelIn.loop = true;
             }
 
-            // Update Fishing Mechanics
             if (nui.Fishing) {
                 const f = nui.Fishing;
                 TENSION_SAFE_MIN = f.tensionSafeMin || 30;
@@ -1048,17 +1007,25 @@ const app = createApp({
                 BITE_WINDOW = nui.Biting.biteWindow || 2000;
             }
 
-            // Generate shrimpTypesByLevel from Config.LevelConfig and Config.NUIItems
-            if (config.LevelConfig && config.NUIItems) {
+            // Generate shrimpTypesByLevel from Config.LevelConfig and Config.Items
+            if (config.LevelConfig && config.Items) {
+                // Pre-process items by ID for easy lookup
+                const itemsById = {};
+                for (const [key, itemData] of Object.entries(config.Items)) {
+                    if (itemData && itemData.id) {
+                        itemsById[itemData.id] = itemData;
+                    }
+                }
+
                 const levels = {};
                 for (const [lvl, data] of Object.entries(config.LevelConfig)) {
                     levels[lvl] = [];
                     for (const [itemId, chance] of Object.entries(data.rates || {})) {
-                        if (chance > 0 && config.NUIItems[itemId]) {
+                        if (chance > 0 && itemsById[itemId]) {
                             levels[lvl].push({
                                 id: itemId,
-                                name: config.NUIItems[itemId].name,
-                                image: config.NUIItems[itemId].image,
+                                name: itemsById[itemId].name,
+                                image: itemsById[itemId].image,
                                 chance: chance
                             });
                         }
@@ -1070,30 +1037,28 @@ const app = createApp({
 
         // Event Handling
         const handleMessage = (event) => {
-            if (event.data.action === 'showTomTich') {
-                if (event.data.config) updateConfig(event.data.config);
+            let data = event.data
+            console.log(data.action)
+            if (data.action === 'showTomTit') {
+                if (data.config) updateConfig(data.config);
                 resetGameState();
                 gamePhase.value = 'IDLE';
-                tomtichVisible.value = true;
-                if (event.data.level) {
-                    playerLevel.value = Math.min(3, Math.max(1, event.data.level));
+                tomtitVisible.value = true;
+                if (data.level) {
+                    playerLevel.value = Math.min(3, Math.max(1, data.level));
                 }
-            } else if (event.data.action === 'hideTomTich') {
+            } else if (data.action === 'hideTomTit') {
                 closeGameUI();
-            } else if (event.data.action === 'updateLevel') {
-                if (event.data.level) {
-                    playerLevel.value = Math.min(3, Math.max(1, event.data.level));
-                }
-            } else if (event.data.action === 'showTreasure') {
-                if (event.data.config) updateConfig(event.data.config);
+            } else if (data.action === 'showTreasure') {
+                if (data.config) updateConfig(data.config);
                 initTreasureGame();
-            } else if (event.data.action === 'hideTreasure') {
+            } else if (data.action === 'hideTreasure') {
                 closeTreasureGame();
-            } else if (event.data.action === 'treasureGameData') {
-                treasureAttempts.value = event.data.data.attempts;
-            } else if (event.data.action === 'tomtichResult') {
+            } else if (data.action === 'treasureGameData') {
+                treasureAttempts.value = data.data.attempts;
+            } else if (data.action === 'tomtitResult') {
                 // Server đã xác nhận kết quả, UI có thể hiển thị thêm hiệu ứng nếu cần
-                console.log("TomTich Result received:", event.data.success);
+                console.log("tomtit Result received:", data.success);
             }
         };
 
@@ -1168,7 +1133,7 @@ const app = createApp({
 
         const handleTreasureClose = () => {
             closeTreasureGame();
-            fetch(`https://${getParentResourceName()}/closeTreasure`, {
+            fetch(`https://f17_cautomtit/closeTreasure`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({})
@@ -1276,7 +1241,7 @@ const app = createApp({
                     SOUNDS.win.play().catch(() => { });
 
                     // Notify server ONLY when win to give reward
-                    fetch(`https://${getParentResourceName()}/treasureFinish`, {
+                    fetch(`https://f17_cautomtit/treasureFinish`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ success: true })
@@ -1285,7 +1250,7 @@ const app = createApp({
                     treasureResultMessage.value = '😔 Hết lượt! Hãy thử lại lần sau.';
                     SOUNDS.lose.play().catch(() => { });
 
-                    fetch(`https://${getParentResourceName()}/treasureFinish`, {
+                    fetch(`https://f17_cautomtit/treasureFinish`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ success: false })
@@ -1301,8 +1266,8 @@ const app = createApp({
 
         const handleKeydown = (e) => {
             if (e.key === 'Escape') {
-                if (tomtichVisible.value) {
-                    handleTomTichClose();
+                if (tomtitVisible.value) {
+                    handleTomTitClose();
                 } else if (treasureVisible.value) {
                     handleTreasureClose();
                 }
@@ -1350,12 +1315,12 @@ const app = createApp({
         });
 
         return {
-            tomtichVisible,
+            tomtitVisible,
             gamePhase,
             showTunnelInstruction,
             tunnelCanvas,
             tunnelCompleted,
-            tomtichResultSuccess,
+            tomtitResultSuccess,
             resultMessage,
             tunnelMessage,
             tunnelProgress,
@@ -1370,8 +1335,8 @@ const app = createApp({
             shrimpPulling,
             currentShrimpImage,
             playerLevel,
-            handleTomTichClose,
-            startTomTichGame: () => { /* No-op, auto start via space */ },
+            handleTomTitClose,
+            startTomTitGame: () => { /* No-op, auto start via space */ },
             // Treasure Hunt
             treasureVisible,
             treasureCells,

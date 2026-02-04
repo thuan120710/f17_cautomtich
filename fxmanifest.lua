@@ -1,32 +1,31 @@
+name 'f17_cautomtit'
+author 'Thảo#3922'
+version 'v2.0.0'
+description 'f17_cautomtit | Hệ thống nghề tôm tít by F17 Team'
 fx_version 'cerulean'
 game 'gta5'
+lua54 'yes'
 
-author 'FiveM Developer'
-description 'Mini Game Câu Tôm Tích'
-version '1.0.0'
-
-shared_scripts {
+ shared_scripts {
     '@ox_lib/init.lua',
 	'config.lua',
+    'shared.lua'
 }
 
--- Server scripts
-server_scripts {
-    'server/main.lua'
-}
-
--- Client scripts
 client_scripts {
+    'main_fc.lua',
     'client/main.lua'
 }
 
--- UI files
+server_scripts {
+    '@oxmysql/lib/MySQL.lua',
+    'server/main.lua'
+}
+
 ui_page 'html/index.html'
 
 files {
     'html/index.html',
-    'html/script.js',
-    'html/style.css',
     'html/images/*.png',
     'html/images/*.jpg',
     'html/sounds/*.mp3',

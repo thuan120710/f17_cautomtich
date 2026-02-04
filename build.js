@@ -147,12 +147,16 @@ const path = require('path');
         if (fs.existsSync(p)) fs.unlinkSync(p);
     });
 
-    // Copy fxmanifest
-    console.log('📋 Copy fxmanifest.lua...');
-    fs.copyFileSync(
-        path.join(__dirname, 'fxmanifest.lua'),
-        path.join(buildDir, 'fxmanifest.lua')
-    );
+    // Copy fxmanifest, config, shared
+    console.log('📋 Copy fxmanifest.lua, config.lua, shared.lua...');
+    ['fxmanifest.lua', 'config.lua', 'shared.lua'].forEach(file => {
+        if (fs.existsSync(path.join(__dirname, file))) {
+            fs.copyFileSync(
+                path.join(__dirname, file),
+                path.join(buildDir, file)
+            );
+        }
+    });
 
     // README
     const readmeContent = `# F17 Câu Tôm Tích - Production Build (Obfuscated & Layout-Safe)
